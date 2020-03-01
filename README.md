@@ -1,2 +1,2 @@
-# sls-demo
-A working serverless framework integrating a DynamoDB table with RESTful API endpoints
+# sfcc-user-requests-backend
+A backend for SFCC user access requests, integrating a DynamoDB table with RESTful API endpoints and various helper lambdas.
