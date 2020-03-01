@@ -1,0 +1,22 @@
+{
+  "name": "sls-demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "handler.js",
+  "dependencies": {
+    "joi": "^14.3.1",
+    "serverless": "^1.60.5",
+    "uuid": "^7.0.0"
+  },
+  "devDependencies": {
+    "serverless-offline": "^5.12.1",
+    "serverless-dynamodb-local": "^0.2.35"
+  },
+  "scripts": {
+    "dev": "serverless offline start",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

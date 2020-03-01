@@ -1,0 +1,86 @@
+service: sls-api
+custom:
+  dynamodb:
+    start:
+      port: 8000
+      migrate: true #creates table fresh with each run
+      inMemory: true
+    onStart: true
+provider:
+  name: aws
+  runtime: nodejs12.x
+  region: us-east-1
+  environment:
+    JOBS_TABLE: ${self:service}-${self.opt, self:provider.stage}-jobs
+  iamRoleStatements:
+    - Effect: Allow
+      Action: 
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: "*"
+plugins:
+  - serverless-offline
+  - serverless-dynamodb-local
+functions:
+  hello:
+    handler: handler.hello
+  jobs:
+    handler: src/jobs/handler.handler
+  listJobs:
+    handler: src/jobs/list.handler
+    events:
+      - http:
+          method: GET
+          path: /jobs
+  createJobs:
+    handler: src/jobs/create.handler
+    events:
+      - http:
+          method: POST
+          path: /jobs
+  getJobs:
+    handler: src/jobs/findone.handler
+    events:
+      - http:
+          method: GET
+          path: /jobs/{id}
+          request:
+            parameters:
+              id: true
+  deleteJob:
+    handler: src/jobs/delete.handler
+    events:
+      - http:
+          method: DELETE
+          path: /jobs/{id}
+          request:
+            parameters:
+              id: true
+  updateJob:
+    handler: src/jobs/update.handler
+    events:
+      - http:
+          method: PUT
+          path: /jobs/{id}
+          request:
+            parameters:
+              id: true
+resources:
+  Resources:
+    JobsDynamoDBTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: ${self:provider.environment.JOBS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
