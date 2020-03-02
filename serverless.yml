@@ -1,4 +1,4 @@
-service: sls-api
+service: sfcc-user-requests
 custom:
   dynamodb:
     start:
@@ -6,12 +6,22 @@ custom:
       migrate: true #creates table fresh with each run
       inMemory: true
     onStart: true
+  assets:
+    auto: true
+    targets:
+      - bucket:
+        Ref: UploadsBucket
+        files:
+        - source: src/webapp/
+          globs: '*'
 provider:
   name: aws
   runtime: nodejs12.x
   region: us-east-1
   environment:
-    JOBS_TABLE: ${self:service}-${self.opt, self:provider.stage}-jobs
+    REQUESTS_TABLE: ${self:service}-${self.opt, self:provider.stage}-rqsts
+    S3_UPLOAD_BUCKET:
+      Ref: UploadsBucket
   iamRoleStatements:
     - Effect: Allow
       Action: 
@@ -22,65 +32,83 @@ provider:
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
       Resource: "*"
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+        - s3:PutObjectAcl
+        - s3:GetObject
+        - s3:DeleteObject
+      Resource: "*"
+      #Resource: "arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*"
+    - Effect: Allow
+      Action:
+        - s3:ListBucket
+      Resource: "*"
+      #Resource: "arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*"
 plugins:
   - serverless-offline
   - serverless-dynamodb-local
+  - serverless-s3-deploy
 functions:
-  hello:
-    handler: handler.hello
-  jobs:
-    handler: src/jobs/handler.handler
-  listJobs:
-    handler: src/jobs/list.handler
+  listRqsts:
+    handler: src/rqsts/list.handler
     events:
       - http:
           method: GET
-          path: /jobs
-  createJobs:
-    handler: src/jobs/create.handler
+          path: /rqsts
+  createRqsts:
+    handler: src/rqsts/create.handler
     events:
       - http:
           method: POST
-          path: /jobs
-  getJobs:
-    handler: src/jobs/findone.handler
+          path: /rqsts
+  getRqsts:
+    handler: src/rqsts/findone.handler
     events:
       - http:
           method: GET
-          path: /jobs/{id}
+          path: /rqsts/{id}
           request:
             parameters:
               id: true
-  deleteJob:
-    handler: src/jobs/delete.handler
+  deleteRqst:
+    handler: src/rqsts/delete.handler
     events:
       - http:
           method: DELETE
-          path: /jobs/{id}
+          path: /rqsts/{id}
           request:
             parameters:
               id: true
-  updateJob:
-    handler: src/jobs/update.handler
+  updateRqst:
+    handler: src/rqsts/update.handler
     events:
       - http:
           method: PUT
-          path: /jobs/{id}
+          path: /rqsts/{id}
           request:
             parameters:
               id: true
+  sendSignedUrl:
+    handler: src/send/send.handler
+    events:
+      - http:
+          method: POST
+          path: /send
+  upload:
+    handler: src/upld/upld.handler
+    events:
+      - http:
+          method: POST
+          path: /upld    
+  validateAndPush:
+    handler: src/push/push.handler
+    events:
+      - http:
+          method: POST
+          path: /push
 resources:
-  Resources:
-    JobsDynamoDBTable:
-      Type: "AWS::DynamoDB::Table"
-      Properties:
-        TableName: ${self:provider.environment.JOBS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
+  # DynamoDB
+  - ${file(resources/dynamodb.yml)}
+  # S3
+  - ${file(resources/s3.yml)}

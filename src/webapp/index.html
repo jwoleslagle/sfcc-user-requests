@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>SFCC Bulk User Requests</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src='https://www.google.com/recaptcha/api.js' async defer>
+    </script>
+    <script src="script.js"></script>
+  </head>
+  <body>
+    <div class="wrapper">
+        <img src="hbc_logo.png" />
+        <div class="box header">
+          <h1>SFCC User Access</h1>
+          <h2>Bulk Requests</h2>
+        </div>
+        <div class="box sidebar">Step One<br /><br /><br /><br /><br /><br />Step <br />Two</div>
+        <div class="box content">
+            <form id="form">
+                <p class="form__errors" style="display: none;">Please fill in all fields.</p>
+                
+                <label for="name_input">Please enter the filename you'll be uploading:</label><br/>
+                <input type="text" id="filename_input" size="50" name="filename"><br /><br />
+                
+                <p class="form__success" style="display: none;">Please check your email!</p>
+                <p class="form__sending" style="display: none;">Sending...</p>
+              
+                <button type="submit" class="g-recaptcha form__button"
+                  data-sitekey="6LdZjN0UAAAAABMk4CajbygXMEK-biqWPuzQzi6x"
+                  data-callback="handleFormSubmit"
+                  data-badge="inline">Get a presigned URL</button>
+            </form>
+            <hr />
+            <form id="form">
+              <p class="form__errors" style="display: none;">Please fill in all fields.</p>
+              
+              <label for="pUrl_input">Please enter the presigned URL:</label><br/>
+              <textarea id="pUrl_input" rows="20" cols="80"></textarea><br />
+
+              <label for="file">Choose a file to upload:</label>
+              <input type="file"
+              id="file" name="avatar"
+              accept="text/csv, text/tab-separated-values, text/tsv">
+              
+              <p class="form__success" style="display: none;">Please check your email!</p>
+              <p class="form__sending" style="display: none;">Sending...</p>
+              <br />
+              <button type="submit">Upload file</button>
+            </form>
+        <!--
+          <div class="box footer">
+          Questions? Contact <a href="mailto:hbcdigitalinfrastructuresupport@hbc.com">Digital Infra Support</a>
+        -->
+        </div>
+      </div>
+    </body>
+</html>

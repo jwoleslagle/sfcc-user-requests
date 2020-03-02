@@ -4,7 +4,7 @@ module.exports.handler=async (evt, ctx) => {
     return {
         statusCode: 200,
         body: JSON.stringify({
-            message: "Nodejs dev."
+            message: "Pong."
         })
     }
 }

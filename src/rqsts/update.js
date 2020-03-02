@@ -1,5 +1,3 @@
-const AWS = require('aws-sdk');
-const uuid = require('uuid');
 const joi = require('joi');
 const dynamoDB = require('../dynamodb');
 
@@ -23,15 +21,14 @@ module.exports.handler=async(evt, ctx) =>{
     }
     const id = evt.pathParameters.id;
     const params = {
-        TableName: process.env.JOBS_TABLE,
+        TableName: process.env.REQUESTS_TABLE,
         Key: {
             id
         },
         UpdateExpression:
-            'SET title= :title,published= :published,updatedAt= :updatedAt',
+            'SET rqstStatus= :rqstStatus,updatedAt= :updatedAt',
         ExpressionAttributeValues: {
-            ':title': data.title,
-            ':published': data.published,
+            ':rqstStatus': data.status,
             ':updatedAt': timestamp
         },
         ReturnValues: 'ALL_NEW'
