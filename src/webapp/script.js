@@ -1,5 +1,5 @@
 var handleFormSubmit = function () {
-    var formApiEndpoint = 'http:/localhost:300/send'
+    var formApiEndpoint = 'https://n6d16pkfx9.execute-api.us-east-1.amazonaws.com/dev/send'
     var successEl = document.querySelector('.form__success')
     var sendingEl = document.querySelector('.form__sending')
     var errorsEl = document.querySelector('.form__errors')

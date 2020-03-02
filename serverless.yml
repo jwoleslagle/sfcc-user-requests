@@ -9,10 +9,10 @@ custom:
   assets:
     auto: true
     targets:
-      - bucket:
-        Ref: UploadsBucket
+      - bucket: 
+          Ref: WebAppBucket
         files:
-        - source: src/webapp/
+        - source: ./src/webapp/
           globs: '*'
 provider:
   name: aws
@@ -22,6 +22,19 @@ provider:
     REQUESTS_TABLE: ${self:service}-${self.opt, self:provider.stage}-rqsts
     S3_UPLOAD_BUCKET:
       Ref: UploadsBucket
+    API_INVOKE_URL: https://n6d16pkfx9.execute-api.us-east-1.amazonaws.com/dev
+    SRC_EMAIL: jwoleslagle@gmail.com
+    DEST_EMAIL: jwoleslagle@gmail.com
+  stackTags: # Tags to comply with Cloud Engineering requirements
+    owner: jeffrey.woleslagle@hbc.com
+    environment: production
+    projectname: SFCC Production Support
+    application: SFCC
+    exposure: private
+    portfolio: Non-portfolio
+    compliance: non-sensitive
+    projectcode: CR-XXXXX
+    banner: ent
   iamRoleStatements:
     - Effect: Allow
       Action: 
@@ -42,6 +55,12 @@ provider:
       #Resource: "arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*"
     - Effect: Allow
       Action:
+        - ses:SendEmail
+        - ses:SendRawEmail
+      Resource: "*"
+      #Resource: "arn:aws:ses:us-east-1:123456789012:identity/example.com"
+    - Effect: Allow
+      Action:
         - s3:ListBucket
       Resource: "*"
       #Resource: "arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*"
@@ -50,6 +69,12 @@ plugins:
   - serverless-dynamodb-local
   - serverless-s3-deploy
 functions:
+  healthcheck:
+    handler: src/rqsts/healthcheck.handler
+    events:
+      - http:
+          method: GET
+          path: /ping
   listRqsts:
     handler: src/rqsts/list.handler
     events:
@@ -95,12 +120,27 @@ functions:
       - http:
           method: POST
           path: /send
+          request:
+            parameters:
+              fname: true
+  sendHealthcheck:
+    handler: src/send/sendHealthcheck.handler
+    events:
+      - http:
+          method: GET
+          path: /send
   upload:
     handler: src/upld/upld.handler
     events:
       - http:
           method: POST
-          path: /upld    
+          path: /upld
+  upldHealthcheck:
+    handler: src/upld/upldHealthcheck.handler
+    events:
+      - http:
+          method: GET
+          path: /upld
   validateAndPush:
     handler: src/push/push.handler
     events:
@@ -111,4 +151,5 @@ resources:
   # DynamoDB
   - ${file(resources/dynamodb.yml)}
   # S3
-  - ${file(resources/s3.yml)}
+  - ${file(resources/uploads-s3.yml)}
+  - ${file(resources/webapp-s3.yml)}

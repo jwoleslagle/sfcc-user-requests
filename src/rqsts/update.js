@@ -6,8 +6,7 @@ module.exports.handler=async(evt, ctx) =>{
     const timestamp = new Date().toISOString();
     
     const schema = joi.object().keys({
-        title: joi.string().required(),
-        published: joi.boolean().required()
+        rqstStatus: joi.string().required(),
     });
 
     try{
@@ -25,10 +24,14 @@ module.exports.handler=async(evt, ctx) =>{
         Key: {
             id
         },
+        //Check to see if id exists, don't create new if it doesn't
+        ConditionExpression:
+            'id = :id',
         UpdateExpression:
             'SET rqstStatus= :rqstStatus,updatedAt= :updatedAt',
         ExpressionAttributeValues: {
-            ':rqstStatus': data.status,
+            ':id': id,
+            ':rqstStatus': data.rqstStatus,
             ':updatedAt': timestamp
         },
         ReturnValues: 'ALL_NEW'

@@ -1,12 +1,10 @@
-'use strict';
-
 const AWS = require('aws-sdk');
 const s3 = new AWS.S3({signatureVersion: 'v4'});
 const ses = new AWS.SES({region: 'us-east-1'});
 const bucket = process.env.S3_UPLOAD_BUCKET;
 const joi = require('joi');
 
-exports.handler = (event, context, callback) => {
+module.exports.handler=async(evt, ctx) =>{
     const data = JSON.parse(evt.body);
     const schema = joi.object().keys({
         fname: joi.string().required(),
@@ -16,22 +14,17 @@ exports.handler = (event, context, callback) => {
         const {error, value} = joi.validate(data,schema);
     }
     catch(err) {
-        return {
+       return {
             status: 400,
             body: JSON.stringify(err.details)
         }
     }
 
     if (!bucket) {
-        callback(new Error(`S3 bucket not set`));
-    }
-    
-    const key = event.fname;
-    if (!key) {
-        callback(new Error('S3 object key missing'));
-        return;
+        ctx.fail(new Error(`Bucket not set`));
     }
 
+    const key = data.fname;
     const params = {'Bucket': bucket, 'Key': key, Expires: 1800};
     
     s3.getSignedUrl('putObject', params, function (err, url) {
@@ -41,7 +34,7 @@ exports.handler = (event, context, callback) => {
             console.log('Signed URL was created.');
             const paramsSES = {
             Destination: {
-                ToAddresses: [process.env.destEmail]
+                ToAddresses: [process.env.DEST_EMAIL]
             },
             Message: {
             Body: {
@@ -51,17 +44,17 @@ exports.handler = (event, context, callback) => {
                 Subject: { Data: "Signed URL for SFCC bulk access requests"  
                 }
             },
-            Source: process.env.srcEmail
+            Source: process.env.SRC_EMAIL
             };
     
         ses.sendEmail(paramsSES, function (err, data) {
             callback(null, {err: err, data: data});
             if (err) {
                 console.log(err);
-                context.fail(err);
+                ctx.fail(err);
             } else {
                 console.log(data);
-                context.succeed(event);
+                ctx.succeed(evt);
             }
         });
     }

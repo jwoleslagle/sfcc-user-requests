@@ -1,7 +1,7 @@
 'use strict';
 
 const fs = require('fs');
-const api = process.env.POST_ENDPOINT;
+const api = `${process.env.API_INVOKE_URL}/rqsts`;
 const axios = require('axios').default;
 
 //turns a csv or tsv file.toString() into an object with the headers as keys
@@ -31,7 +31,7 @@ function readFile (bucketName, filename, onFileContent, onError) {
   var params = { Bucket: bucketName, Key: filename };
   s3.getObject(params, function (err, data) {
       if (!err) 
-          onFileContent(filename, data.Body.toString());
+          readFileContent(filename, data.Body.toString());
       else
           console.log(err);
   });

@@ -1,0 +1,25 @@
+Resources:
+  UploadsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT]
+            AllowedOrigins: ['*']
+            Id: CORSRuleId1
+            MaxAge: '3600'
+  # Print out the name of the bucket that is created
+Outputs:
+  UploadsBucketArn:
+    Value:
+      Fn::GetAtt:
+        - UploadsBucket
+        - Arn
+    Export:
+      Name: ${self:provider.stage}-UploadsBucketArn
+  UploadsBucketName:
+    Value:
+      Ref: UploadsBucket
+    Export:
+      Name: ${self:provider.stage}-UploadsBucket    

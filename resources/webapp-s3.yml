@@ -1,0 +1,35 @@
+Resources:
+  WebAppBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+  # BucketPolicyWebAppBucket:
+  #   Type: 'AWS::S3::BucketPolicy'
+  #   Properties:
+  #     PolicyDocument:
+  #       Statement:
+  #         - Sid: PublicReadForGetBucketObjects
+  #           Effect: Allow
+  #           Principal: '*'
+  #           Action:
+  #             - 's3:GetObject'
+  #           Resource: arn:aws:s3:::sfcc-user-requests-dev-webappbucket-4q8d90qhoooq/*
+  #     Bucket:
+  #       Ref: WebAppBucket
+  #Print out the name of the bucket that was created
+Outputs:
+  WebAppBucketArn:
+    Value:
+      Fn::GetAtt:
+        - WebAppBucket
+        - Arn
+    Export:
+      Name: ${self:provider.stage}-WebAppBucketArn
+  WebAppBucketName:
+    Value:
+      Ref: WebAppBucket
+    Export:
+      Name: ${self:provider.stage}-WebAppBucket
