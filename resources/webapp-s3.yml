@@ -16,7 +16,7 @@ Resources:
   #           Principal: '*'
   #           Action:
   #             - 's3:GetObject'
-  #           Resource: arn:aws:s3:::sfcc-user-requests-dev-webappbucket-4q8d90qhoooq/*
+  #           Resource: #TODO: Fix this resource
   #     Bucket:
   #       Ref: WebAppBucket
   #Print out the name of the bucket that was created

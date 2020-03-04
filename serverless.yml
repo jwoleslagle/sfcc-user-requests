@@ -18,6 +18,7 @@ provider:
   name: aws
   runtime: nodejs12.x
   region: us-east-1
+  stage: beta
   environment:
     REQUESTS_TABLE: ${self:service}-${self.opt, self:provider.stage}-rqsts
     S3_UPLOAD_BUCKET:
@@ -25,6 +26,7 @@ provider:
     API_INVOKE_URL: https://n6d16pkfx9.execute-api.us-east-1.amazonaws.com/dev
     SRC_EMAIL: jwoleslagle@gmail.com
     DEST_EMAIL: jwoleslagle@gmail.com
+    SES_REGION: ${self:provider.region}
   stackTags: # Tags to comply with Cloud Engineering requirements
     owner: jeffrey.woleslagle@hbc.com
     environment: production
@@ -36,34 +38,34 @@ provider:
     projectcode: CR-XXXXX
     banner: ent
   iamRoleStatements:
-    - Effect: Allow
-      Action: 
-        - dynamodb:Query
-        - dynamodb:Scan
-        - dynamodb:GetItem
-        - dynamodb:PutItem
-        - dynamodb:UpdateItem
-        - dynamodb:DeleteItem
-      Resource: "*"
-    - Effect: Allow
-      Action:
-        - s3:PutObject
-        - s3:PutObjectAcl
-        - s3:GetObject
-        - s3:DeleteObject
-      Resource: "*"
-      #Resource: "arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*"
-    - Effect: Allow
-      Action:
-        - ses:SendEmail
-        - ses:SendRawEmail
-      Resource: "*"
-      #Resource: "arn:aws:ses:us-east-1:123456789012:identity/example.com"
-    - Effect: Allow
-      Action:
-        - s3:ListBucket
-      Resource: "*"
-      #Resource: "arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*"
+  - Effect: Allow
+    Action: 
+      - dynamodb:Query
+      - dynamodb:Scan
+      - dynamodb:GetItem
+      - dynamodb:PutItem
+      - dynamodb:UpdateItem
+      - dynamodb:DeleteItem
+    Resource: "*"
+  - Effect: Allow
+    Action:
+      - s3:PutObject
+      - s3:PutObjectAcl
+      - s3:GetObject
+      - s3:DeleteObject
+    Resource: "*"
+    #Resource: "arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*"
+  - Effect: Allow
+    Action:
+      - ses:SendEmail
+      - ses:SendRawEmail
+    Resource: "*"
+    #Resource: "arn:aws:ses:us-east-1:123456789012:identity/example.com"
+  - Effect: Allow
+    Action:
+      - s3:ListBucket
+    Resource: "*"
+    #Resource: "arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*"
 plugins:
   - serverless-offline
   - serverless-dynamodb-local
@@ -120,9 +122,6 @@ functions:
       - http:
           method: POST
           path: /send
-          request:
-            parameters:
-              fname: true
   sendHealthcheck:
     handler: src/send/sendHealthcheck.handler
     events:

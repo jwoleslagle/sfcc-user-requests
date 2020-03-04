@@ -1,62 +1,61 @@
 const AWS = require('aws-sdk');
+AWS.config.update({region: 'us-east-1'}); //process.env.SES_REGION//must run before ses and s3 instantiate
 const s3 = new AWS.S3({signatureVersion: 'v4'});
-const ses = new AWS.SES({region: 'us-east-1'});
+const ses = new AWS.SES();
 const bucket = process.env.S3_UPLOAD_BUCKET;
-const joi = require('joi');
+const srcEmail = process.env.SRC_EMAIL;
+const destEmail = process.env.DEST_EMAIL;
 
-module.exports.handler=async(evt, ctx) =>{
-    const data = JSON.parse(evt.body);
-    const schema = joi.object().keys({
-        fname: joi.string().required(),
-    });
-  
-    try{
-        const {error, value} = joi.validate(data,schema);
-    }
-    catch(err) {
-       return {
-            status: 400,
-            body: JSON.stringify(err.details)
+async function getUploadUrl(parameters) {
+    const data = await new Promise((resolve, reject) => {
+        try {
+            s3.getSignedUrl('getObject', parameters, (err, url) => {
+                console.log("Signed URL created.")
+                resolve(url)
+            })
         }
-    }
+        catch (error) {
+            reject(error);
+        }
+    });
+    return data;
+}
 
-    if (!bucket) {
-        ctx.fail(new Error(`Bucket not set`));
-    }
+async function createEmail(signedUrl) {
+    const email = {
+        Destination: {
+            ToAddresses: [destEmail]
+        },
+        Message: 
+        {
+        Body: {
+            Text: { Data: `Please find the requested signed url below:\n\n${signedUrl}\n\nUse this url on the page where you requested this URL.\n\nPlease note:\n1) This signed url will expire in 30 min, and is one-time use only.\n 2) Make sure the upload filename matches what was provided.`
+            }
+            },
+            Subject: { Data: "Signed URL for SFCC bulk access requests"  
+            }
+        },
+        Source: srcEmail
+    };
+    return email;
+}
 
+async function sendEmail(params) {
+    const sendPromise = await ses.sendEmail(params).promise();
+    return sendPromise;
+}
+
+module.exports.handler=async(event) =>{
+    const data = JSON.parse(event.body);
     const key = data.fname;
     const params = {'Bucket': bucket, 'Key': key, Expires: 1800};
-    
-    s3.getSignedUrl('putObject', params, function (err, url) {
-        if (err) {
-        callback(err);
-        } else {
-            console.log('Signed URL was created.');
-            const paramsSES = {
-            Destination: {
-                ToAddresses: [process.env.DEST_EMAIL]
-            },
-            Message: {
-            Body: {
-                Text: { Data: `Please find the requested signed url below:\n\n${url}\n\nUse this url on the page where you requested this URL.\n\nPlease note:\n1) This signed url will expire in 30 min, and is one-time use only.\n 2) Make sure the upload filename matches what was provided.`
-                }
-                },
-                Subject: { Data: "Signed URL for SFCC bulk access requests"  
-                }
-            },
-            Source: process.env.SRC_EMAIL
-            };
-    
-        ses.sendEmail(paramsSES, function (err, data) {
-            callback(null, {err: err, data: data});
-            if (err) {
-                console.log(err);
-                ctx.fail(err);
-            } else {
-                console.log(data);
-                ctx.succeed(evt);
-            }
-        });
-    }
-  });
-};
+    const urlPromise = getUploadUrl(params);
+    //create the email
+    const emailParams = createEmail(await urlPromise);
+    //send the email
+    const emailResp = sendEmail(await emailParams);
+    console.log(`Email sent: ${await emailResp}`);
+    return {
+        "statusCode": 200, 
+        "body": JSON.stringify(await emailResp)}
+}
