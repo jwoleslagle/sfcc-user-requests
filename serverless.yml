@@ -84,6 +84,18 @@ functions:
       - http:
           method: GET
           path: /rqsts
+  listAddRqsts:
+    handler: src/rqsts/listStatusAdd.handler
+    events:
+      - http:
+          method: GET
+          path: /rqsts/add
+  listDeleteRqsts:
+    handler: src/rqsts/listStatusDelete.handler
+    events:
+      - http:
+          method: GET
+          path: /rqsts/delete
   createRqsts:
     handler: src/rqsts/create.handler
     events:

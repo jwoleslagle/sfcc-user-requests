@@ -1,7 +1,7 @@
 const AWS = require('aws-sdk');
 const s3 = new AWS.S3({signatureVersion: 'v4'});
-const bucket = 'sfcc-test-bucket'; //process.env.S3_UPLOAD_BUCKET;
-const api = 'https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta/rqsts'; //`${process.env.API_INVOKE_URL}/rqsts`;
+const bucket = process.env.S3_UPLOAD_BUCKET;
+const api = `${process.env.API_INVOKE_URL}/rqsts`;
 const axios = require('axios').default;
 
 //Step 1: Get a list of the files in the uploads/ pseudo-folder
@@ -107,7 +107,7 @@ function moveFile(filename,dest) {
         console.log(copyErr);
         }
         else {
-            console.log('Copied: ', copyParams.Key);
+            console.log('Copied to: ', copyParams.Key);
             // removing source files
             const deleteParams = {
                 Bucket: bucket,
@@ -124,8 +124,7 @@ function moveFile(filename,dest) {
 }
 
 ///EXECUTION BEGINS HERE
-async function main() {
-//module.exports.handler=async(event) => {
+module.exports.handler=async(event) => {
     const upldListPromise = listUploads();
     upldListPromise.then((data) => {
         let allKeys = [];
@@ -165,5 +164,3 @@ async function main() {
         });
     })
 }
-
-main();
