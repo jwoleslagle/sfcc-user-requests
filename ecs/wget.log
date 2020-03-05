@@ -1,0 +1,11 @@
+--2020-03-05 15:48:09--  https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta/rqsts/delete
+Resolving op857sfym8.execute-api.us-east-1.amazonaws.com (op857sfym8.execute-api.us-east-1.amazonaws.com)... 13.226.182.124, 13.226.182.120, 13.226.182.112, ...
+Connecting to op857sfym8.execute-api.us-east-1.amazonaws.com (op857sfym8.execute-api.us-east-1.amazonaws.com)|13.226.182.124|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 860 [application/json]
+Saving to: ‘.DEL_2020-03-05T15:48:09-05:00’
+
+     0K                                                       100% 29.3M=0s
+
+2020-03-05 15:48:10 (29.3 MB/s) - ‘.DEL_2020-03-05T15:48:09-05:00’ saved [860/860]
+
