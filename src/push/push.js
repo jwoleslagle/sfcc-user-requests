@@ -1,11 +1,48 @@
-'use strict';
-
-const fs = require('fs');
-const api = `${process.env.API_INVOKE_URL}/rqsts`;
+const AWS = require('aws-sdk');
+const s3 = new AWS.S3({signatureVersion: 'v4'});
+const bucket = 'sfcc-test-bucket'; //process.env.S3_UPLOAD_BUCKET;
+const api = 'https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta/rqsts'; //`${process.env.API_INVOKE_URL}/rqsts`;
 const axios = require('axios').default;
 
-//turns a csv or tsv file.toString() into an object with the headers as keys
-function toJSON(rawFileString, fileType) {
+//Step 1: Get a list of the files in the uploads/ pseudo-folder
+async function listUploads() {
+    //const listUploads = () => {
+        const getListParams = {
+            Bucket: 'sfcc-test-bucket', // your bucket name,
+            Prefix: 'upload' // the "folder" name we want to list
+        }
+        return new Promise ((resolve, reject) => {
+            s3.listObjectsV2(getListParams, ((err, data) => {
+                // Handle any error and exit
+                if (err) {
+                    reject (err);
+                    }
+                // No error happened
+                resolve (data);
+            }));
+        })
+    }
+
+//Step 2: Get each file's contents
+async function getS3Obj(key) {
+    const getObjParams = {
+        Bucket: bucket, // your bucket name,
+        Key: key // path to the object you're looking for
+    }
+    return new Promise ((resolve, reject) => {
+        s3.getObject(getObjParams, ((err, data) => {
+            // Handle any error and exit
+            if (err) {
+                reject (err);
+                }
+            // No error happened
+            resolve (data);
+        }));
+    })
+}
+
+//Step 3: Turn a csv or tsv file.toString() into an object with the headers as keys
+function toJSON (rawFileString, fileType) {
     const dirtyLines = rawFileString.split('\n');
     let delimiter = ',';
     if (fileType =='tsv') { 
@@ -26,21 +63,9 @@ function toJSON(rawFileString, fileType) {
     });
   }
 
-  
-function readFile (bucketName, filename, onFileContent, onError) {
-  var params = { Bucket: bucketName, Key: filename };
-  s3.getObject(params, function (err, data) {
-      if (!err) 
-          readFileContent(filename, data.Body.toString());
-      else
-          console.log(err);
-  });
-}
-
-function readFileContent(filename, content) {
-  let rawData = content.toString('utf8');
-  const objArray = toJSON(rawData,filetype);
-  console.log(objArray);
+//Step 4: Swap out banner keys and push rows (items) to the DynamoDB
+function transformAndPush(filename, content, filetype) {
+  const objArray = toJSON(content,filetype);
   objArray.forEach((item) => {
     let bnr = item.banner;
     if (bnr == 'Bay') { item.banner = "bdpt_prd" }
@@ -49,37 +74,90 @@ function readFileContent(filename, content) {
     else if (bnr == 'All') { item.banner = "bdpt_prd,bdkj_prd,bdms_prd" };
     if (item.action = "ADD") {
       item.rqstStatus = "ADD_AMROLE";
-    } else { item.rqstStatus = "DEL_AMROLE"};
+    } else { item.rqstStatus = "DEL_ALL"};
     //Push individual requests to DynamoDB
     axios.post(api, item)
-    .then(function (response) {
-      console.log(response);
+    .then((response) => {
+      // move file to completed folder
+      const dest = "completed";
+      moveFile(filename,dest);
     })
-    .catch(function (error) {
+    .catch((error) => {
       console.log(error);
+      // move file to /errors folder
+      const dest = "errors";
+      moveFile(filename,dest);
     });
-
   });
-  console.log(objArray);  
 }
 
-function onError (err) {
-  console.log('error: ' + err);
-} 
-
-/////EXECUTION STARTS HERE
-exports.handler = (event, context, callback) => {  
-  const data = JSON.parse(evt.body);
-  const filename = data.filename;
-  const filetype = filename.split('.').pop().toLowerCase();
-  const acceptedFiletypes = ['csv','tsv'];
-
-  if (acceptedFiletypes.includes(filetype)) {
-    var bucketName = process.env.S3_UPLOAD_BUCKET;
-    var keyName = `/upload/${filename}`;
-
-    readFile(bucketName, keyName, readFileContent, onError);
-  } else {
-      console.error('Please input a valid comma-separated values(CSV) or tab-separated values(TSV) file.')
-  }
+//Step 5: move the file to the completed/ or errors/ pseudo-folder
+function moveFile(filename,dest) {
+    const oldPrefix = 'upload/';
+    let newPrefix = 'completed/';
+    if (dest == "errors") {
+        newPrefix = 'errors/';
+    }
+    const copyParams = {
+        Bucket: bucket,
+        CopySource: bucket + '/' + filename,
+        Key: filename.replace(oldPrefix, newPrefix)
+    };
+    s3.copyObject(copyParams, ((copyErr, copyData) => {
+        if (copyErr) {
+        console.log(copyErr);
+        }
+        else {
+            console.log('Copied: ', copyParams.Key);
+            // removing source files
+            const deleteParams = {
+                Bucket: bucket,
+                Key: filename
+            }; 
+            s3.deleteObject(deleteParams, ((deleteErr, deleteData) => {
+                if (deleteErr) {
+                    console.log(deleteErr);
+                }
+                console.log('Removed: ', deleteParams.Key);
+            }))
+        }
+    }))
 }
+
+///EXECUTION BEGINS HERE
+const upldListPromise = listUploads();
+upldListPromise.then((data) => {
+    let allKeys = [];
+    if (data.Contents.length) {
+        let contents = data.Contents;
+        contents.forEach((content) => {
+            //don't get root object
+            if (!(content.Key.endsWith('/'))) {
+                allKeys.push(content.Key);
+            }
+        });
+        if (data.IsTruncated) {
+            params.ContinuationToken = data.NextContinuationToken;
+            console.log("get further list...");
+            listAllKeys();
+        }
+    }
+    allKeys.forEach((key) => {
+        let getObjPromise = getS3Obj(key);
+        getObjPromise.then((fileContents) => {
+            // Convert Body from a Buffer to a String
+            // Use the encoding necessary
+            let fString = fileContents.Body.toString('utf-8');
+            const fname = key;
+            const ftype = fname.split('.').pop().toLowerCase();
+            const acceptedFiletypes = ['csv','tsv'];
+            if (acceptedFiletypes.includes(ftype)) {
+                transformAndPush(key, fString, ftype);
+            } else {
+                moveFile(key,errors);
+                console.error(`${keyName}: Please input a valid comma-separated values(CSV) or tab-separated values(TSV) file.`)
+            }
+        })
+    });
+})
+

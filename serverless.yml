@@ -23,7 +23,7 @@ provider:
     REQUESTS_TABLE: ${self:service}-${self.opt, self:provider.stage}-rqsts
     S3_UPLOAD_BUCKET:
       Ref: UploadsBucket
-    API_INVOKE_URL: https://n6d16pkfx9.execute-api.us-east-1.amazonaws.com/dev
+    API_INVOKE_URL: https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta
     SRC_EMAIL: jwoleslagle@gmail.com
     DEST_EMAIL: jwoleslagle@gmail.com
     SES_REGION: ${self:provider.region}
@@ -46,26 +46,27 @@ provider:
       - dynamodb:PutItem
       - dynamodb:UpdateItem
       - dynamodb:DeleteItem
-    Resource: "*"
+    Resource: 
+      Fn::GetAtt: [ RqstsDynamoDBTable, Arn ]
   - Effect: Allow
     Action:
       - s3:PutObject
       - s3:PutObjectAcl
       - s3:GetObject
       - s3:DeleteObject
-    Resource: "*"
-    #Resource: "arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*"
+    Resource: 
+      Fn::GetAtt: [ UploadsBucket, Arn ]
+  - Effect: Allow
+    Action:
+      - s3:ListBucket
+    Resource:       
+      Fn::GetAtt: [ UploadsBucket, Arn ]
   - Effect: Allow
     Action:
       - ses:SendEmail
       - ses:SendRawEmail
-    Resource: "*"
-    #Resource: "arn:aws:ses:us-east-1:123456789012:identity/example.com"
-  - Effect: Allow
-    Action:
-      - s3:ListBucket
-    Resource: "*"
-    #Resource: "arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*"
+    # This should be changed for go-live
+    Resource: "arn:aws:ses:us-east-1:636338013835:identity/jwoleslagle@gmail.com"
 plugins:
   - serverless-offline
   - serverless-dynamodb-local
@@ -128,18 +129,6 @@ functions:
       - http:
           method: GET
           path: /send
-  upload:
-    handler: src/upld/upld.handler
-    events:
-      - http:
-          method: POST
-          path: /upld
-  upldHealthcheck:
-    handler: src/upld/upldHealthcheck.handler
-    events:
-      - http:
-          method: GET
-          path: /upld
   validateAndPush:
     handler: src/push/push.handler
     events:
