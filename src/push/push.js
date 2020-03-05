@@ -1,7 +1,7 @@
 const AWS = require('aws-sdk');
 const s3 = new AWS.S3({signatureVersion: 'v4'});
-const bucket = process.env.S3_UPLOAD_BUCKET;
-const api = `${process.env.API_INVOKE_URL}/rqsts`;
+const bucket = 'sfcc-test-bucket'; //process.env.S3_UPLOAD_BUCKET;
+const api = 'https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta/rqsts'; //`${process.env.API_INVOKE_URL}/rqsts`;
 const axios = require('axios').default;
 
 //Step 1: Get a list of the files in the uploads/ pseudo-folder
@@ -73,9 +73,10 @@ function transformAndPush(filename, content, filetype) {
     else if (bnr == 'O5A') { item.banner = "bdkj_prd" }
     else if (bnr == 'Saks') { item.banner = "bdms_prd" }
     else if (bnr == 'All') { item.banner = "bdpt_prd,bdkj_prd,bdms_prd" };
-    if (item.action = "ADD") {
-      item.rqstStatus = "ADD_AMROLE";
-    } else { item.rqstStatus = "DEL_ALL"};
+    item.rqstStatus = "ADD_ALL";
+    if (item.action == "DELETE") {
+        item.rqstStatus = "DEL_ALL";
+    } 
     //Push individual requests to DynamoDB
     axios.post(api, item)
     .then((response) => {
@@ -123,7 +124,8 @@ function moveFile(filename,dest) {
 }
 
 ///EXECUTION BEGINS HERE
-module.exports.handler=async(event) => {
+async function main() {
+//module.exports.handler=async(event) => {
     const upldListPromise = listUploads();
     upldListPromise.then((data) => {
         let allKeys = [];
@@ -140,7 +142,9 @@ module.exports.handler=async(event) => {
                 console.log("get further list...");
                 listAllKeys();
             }
-        }
+        } else {
+            console.log("No files found in upload/ folder.")
+        };
         allKeys.forEach((key) => {
             let getObjPromise = getS3Obj(key);
             getObjPromise.then((fileContents) => {
@@ -161,3 +165,5 @@ module.exports.handler=async(event) => {
         });
     })
 }
+
+main();
