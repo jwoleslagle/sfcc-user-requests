@@ -1,14 +1,14 @@
 const AWS = require('aws-sdk');
 const s3 = new AWS.S3({signatureVersion: 'v4'});
-const bucket = 'sfcc-test-bucket'; //process.env.S3_UPLOAD_BUCKET;
-const api = 'https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta/rqsts'; //`${process.env.API_INVOKE_URL}/rqsts`;
+const bucket = process.env.S3_UPLOAD_BUCKET;
+const api = `${process.env.API_INVOKE_URL}/rqsts`;
 const axios = require('axios').default;
 
 //Step 1: Get a list of the files in the uploads/ pseudo-folder
 async function listUploads() {
     //const listUploads = () => {
         const getListParams = {
-            Bucket: 'sfcc-test-bucket', // your bucket name,
+            Bucket: bucket, // your bucket name,
             Prefix: 'upload' // the "folder" name we want to list
         }
         return new Promise ((resolve, reject) => {
@@ -123,40 +123,41 @@ function moveFile(filename,dest) {
 }
 
 ///EXECUTION BEGINS HERE
-const upldListPromise = listUploads();
-upldListPromise.then((data) => {
-    let allKeys = [];
-    if (data.Contents.length) {
-        let contents = data.Contents;
-        contents.forEach((content) => {
-            //don't get root object
-            if (!(content.Key.endsWith('/'))) {
-                allKeys.push(content.Key);
+module.exports.handler=async(event) => {
+    const upldListPromise = listUploads();
+    upldListPromise.then((data) => {
+        let allKeys = [];
+        if (data.Contents.length) {
+            let contents = data.Contents;
+            contents.forEach((content) => {
+                //don't get root object
+                if (!(content.Key.endsWith('/'))) {
+                    allKeys.push(content.Key);
+                }
+            });
+            if (data.IsTruncated) {
+                params.ContinuationToken = data.NextContinuationToken;
+                console.log("get further list...");
+                listAllKeys();
             }
-        });
-        if (data.IsTruncated) {
-            params.ContinuationToken = data.NextContinuationToken;
-            console.log("get further list...");
-            listAllKeys();
         }
-    }
-    allKeys.forEach((key) => {
-        let getObjPromise = getS3Obj(key);
-        getObjPromise.then((fileContents) => {
-            // Convert Body from a Buffer to a String
-            // Use the encoding necessary
-            let fString = fileContents.Body.toString('utf-8');
-            const fname = key;
-            const ftype = fname.split('.').pop().toLowerCase();
-            const acceptedFiletypes = ['csv','tsv'];
-            if (acceptedFiletypes.includes(ftype)) {
-                transformAndPush(key, fString, ftype);
-            } else {
-                const destination = 'errors';
-                moveFile(key, destination);
-                console.error(`${key}: Please input a valid comma-separated values(CSV) or tab-separated values(TSV) file.`)
-            }
-        })
-    });
-})
-
+        allKeys.forEach((key) => {
+            let getObjPromise = getS3Obj(key);
+            getObjPromise.then((fileContents) => {
+                // Convert Body from a Buffer to a String
+                // Use the encoding necessary
+                let fString = fileContents.Body.toString('utf-8');
+                const fname = key;
+                const ftype = fname.split('.').pop().toLowerCase();
+                const acceptedFiletypes = ['csv','tsv'];
+                if (acceptedFiletypes.includes(ftype)) {
+                    transformAndPush(key, fString, ftype);
+                } else {
+                    const destination = 'errors';
+                    moveFile(key, destination);
+                    console.error(`${key}: Please input a valid comma-separated values(CSV) or tab-separated values(TSV) file.`)
+                }
+            })
+        });
+    })
+}
