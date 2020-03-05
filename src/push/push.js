@@ -70,7 +70,7 @@ function transformAndPush(filename, content, filetype) {
   objArray.forEach((item) => {
     let bnr = item.banner;
     if (bnr == 'Bay') { item.banner = "bdpt_prd" }
-    else if (bnr == 'O5A') { item.banner = "bdkj_prd" }
+    else if (bnr == 'Off5th') { item.banner = "bdkj_prd" }
     else if (bnr == 'Saks') { item.banner = "bdms_prd" }
     else if (bnr == 'All') { item.banner = "bdpt_prd,bdkj_prd,bdms_prd" };
     item.rqstStatus = "ADD_ALL";

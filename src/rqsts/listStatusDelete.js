@@ -4,10 +4,10 @@ module.exports.handler=async(evt, ctx) =>{
     try{
         const results = await dynamoDB.query({
             TableName: process.env.REQUESTS_TABLE,
-            IndexName: "status",
+            IndexName: "rqstStatus",
             KeyConditionExpression: "rqstStatus = :v_rqstStatus",
             ExpressionAttributeValues: {
-                ":v_rqstStatus": {"S": "DEL_ALL"}
+                ":v_rqstStatus": "DEL_ALL"
             }
         }).promise();
         return {

@@ -6,7 +6,7 @@
         AttributeDefinitions:
           - AttributeName: id
             AttributeType: S
-          - AttributeName: status
+          - AttributeName: rqstStatus
             AttributeType: S
         KeySchema:
           - AttributeName: id
@@ -15,9 +15,9 @@
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
         GlobalSecondaryIndexes:
-        - IndexName: status
+        - IndexName: rqstStatus
           KeySchema:
-          - AttributeName: status
+          - AttributeName: rqstStatus
             KeyType: HASH
           Projection:
             ProjectionType: ALL
