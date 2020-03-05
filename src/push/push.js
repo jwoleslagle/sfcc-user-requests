@@ -66,6 +66,7 @@ function toJSON (rawFileString, fileType) {
 //Step 4: Swap out banner keys and push rows (items) to the DynamoDB
 function transformAndPush(filename, content, filetype) {
   const objArray = toJSON(content,filetype);
+  let dest = 'completed';
   objArray.forEach((item) => {
     let bnr = item.banner;
     if (bnr == 'Bay') { item.banner = "bdpt_prd" }
@@ -78,17 +79,14 @@ function transformAndPush(filename, content, filetype) {
     //Push individual requests to DynamoDB
     axios.post(api, item)
     .then((response) => {
-      // move file to completed folder
-      const dest = "completed";
-      moveFile(filename,dest);
+      console.log("DB item added:", response);
     })
     .catch((error) => {
-      console.log(error);
-      // move file to /errors folder
-      const dest = "errors";
-      moveFile(filename,dest);
+      console.error("DB item add error:", error);
+      dest = "errors";
     });
   });
+  moveFile(filename,dest);
 }
 
 //Step 5: move the file to the completed/ or errors/ pseudo-folder
@@ -154,8 +152,9 @@ upldListPromise.then((data) => {
             if (acceptedFiletypes.includes(ftype)) {
                 transformAndPush(key, fString, ftype);
             } else {
-                moveFile(key,errors);
-                console.error(`${keyName}: Please input a valid comma-separated values(CSV) or tab-separated values(TSV) file.`)
+                const destination = 'errors';
+                moveFile(key, destination);
+                console.error(`${key}: Please input a valid comma-separated values(CSV) or tab-separated values(TSV) file.`)
             }
         })
     });
