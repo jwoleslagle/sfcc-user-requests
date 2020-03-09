@@ -4,6 +4,7 @@
 SFCC_CI_KEY='9ea5c0b3-3dad-4338-a762-c7d760ec7d88'
 SFCC_CI_PASS='hbc2020!'
 API_ENDPOINT_URL='https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta/rqsts'
+API_KEY='SET_THIS_API_KEY_FOR_PRODUCTION'
 TIMESTAMP=`date --iso-8601=seconds`
 
 #ADDFILE items will be given AM and instance roles, DELFILE items will be removed entirely, and PUTFILE will contain status updates for items that changed  
@@ -12,6 +13,13 @@ ADDINST_FILE=.ADDINST_$TIMESTAMP.json
 DELALL_FILE=.DEL_$TIMESTAMP.json
 UPDATE_FILE=.PUT_$TIMESTAMP.json
 # date +"%Y%m%d"
+
+# POSSIBLE STATUSES
+# `ADD_ALL` - Account Manager user, AM Role, and Instance Role will be added. If user exists, AM and Inst roles will be added.
+# `DEL_ALL` - User will be removed from Account Manager, and all Instance Roles will be removed.
+# `ADD_INST` - Instance Role(s) for the user will be added.
+# `ERROR` - An error was encountered. No further processing will occur.
+# `COMPLETED` - User has been added to AM and given all roles. No further processing will occur.  
 
 # This logfile will contain results from the wget attempts
 LOGFILE=wget_$TIMESTAMP.log
@@ -54,7 +62,7 @@ fi
 
 #Function to curl a status update with the PUT method, note this must happen one at a time and that only status is updateable: id is $1, new status is $2, TODO create function
 pushStatusUpdatetoDDB () {
-    `curl -d \'{"id": $1, "rqstStatus": $2}\' -H "Content-Type: application/json" -X POST $API_ENDPOINT_URL/update`
+    `curl -d \'{"id": $1, "rqstStatus": $2}\' -H "Content-Type: application/json" \'x-api-key: $API_KEY \' -X PUT $API_ENDPOINT_URL/update`
 
 }
 # pushStatusUpdatetoDDB ID NEW_STATUS

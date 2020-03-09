@@ -6,26 +6,38 @@ Resources:
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: error.html
-  # BucketPolicyWebAppBucket:
-  #   Type: 'AWS::S3::BucketPolicy'
-  #   Properties:
-  #     PolicyDocument:
-  #       Statement:
-  #         - Sid: PublicReadForGetBucketObjects
-  #           Effect: Allow
-  #           Principal: '*'
-  #           Action:
-  #             - 's3:GetObject'
-  #           Resource: #TODO: Fix this resource
-  #     Bucket:
-  #       Ref: WebAppBucket
-  #Print out the name of the bucket that was created
+  BucketPolicyWebAppBucket:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Sid: IPAllow
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - 's3:GetObject'
+            Resource:
+              Fn::Join:
+              - ''
+              - - 'arn:aws:s3:::'
+                - Ref: WebAppBucket
+                - '/*'
+            Condition:
+              IpAddress:
+                aws:SourceIp:
+                #Saks VPN IP Addresses for NY, JXN, and TOR
+                - 65.243.45.31/24
+                - 209.11.217.198/24
+                - 199.85.105.7/24
+      Bucket:
+        Ref: WebAppBucket
+#Print out the name of the bucket that was created
 Outputs:
   WebAppBucketArn:
     Value:
       Fn::GetAtt:
-        - WebAppBucket
-        - Arn
+      - WebAppBucket
+      - Arn
     Export:
       Name: ${self:provider.stage}-WebAppBucketArn
   WebAppBucketName:

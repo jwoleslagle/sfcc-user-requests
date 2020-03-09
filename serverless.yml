@@ -19,8 +19,12 @@ provider:
   runtime: nodejs12.x
   region: us-east-1
   stage: beta
+  api-keys:
+    - sfcc-csr-apikey
   environment:
     REQUESTS_TABLE: ${self:service}-${self.opt, self:provider.stage}-rqsts
+    WEBAPP_BUCKET:
+      Ref: WebAppBucket
     S3_UPLOAD_BUCKET:
       Ref: UploadsBucket
     API_INVOKE_URL: https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta
@@ -151,7 +155,6 @@ functions:
       - http:
           method: POST
           path: /send
-          private: true
   sendHealthcheck:
     handler: src/send/sendHealthcheck.handler
     events:
