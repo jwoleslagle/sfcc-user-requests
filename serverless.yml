@@ -27,6 +27,7 @@ provider:
     SRC_EMAIL: jwoleslagle@gmail.com
     DEST_EMAIL: jwoleslagle@gmail.com
     SES_REGION: ${self:provider.region}
+    API_KEY: SET_THIS_API_KEY_FOR_PRODUCTION
   stackTags: # Tags to comply with Cloud Engineering requirements
     owner: jeffrey.woleslagle@hbc.com
     environment: production
@@ -78,36 +79,49 @@ functions:
       - http:
           method: GET
           path: /ping
+          private: true
   listRqsts:
     handler: src/rqsts/list.handler
     events:
       - http:
           method: GET
           path: /rqsts
-  listAddRqsts:
-    handler: src/rqsts/listStatusAdd.handler
+          private: true
+  listAddAllRqsts:
+    handler: src/rqsts/listStatusAddAll.handler
     events:
       - http:
           method: GET
-          path: /rqsts/add
+          path: /rqsts/add/all
+          private: true
+  listAddInstRqsts:
+    handler: src/rqsts/listStatusAddInst.handler
+    events:
+      - http:
+          method: GET
+          path: /rqsts/add/inst
+          private: true
   listDeleteRqsts:
     handler: src/rqsts/listStatusDelete.handler
     events:
       - http:
           method: GET
           path: /rqsts/delete
+          private: true
   createRqsts:
     handler: src/rqsts/create.handler
     events:
       - http:
           method: POST
           path: /rqsts
+          private: true
   getRqsts:
     handler: src/rqsts/findone.handler
     events:
       - http:
           method: GET
           path: /rqsts/{id}
+          private: true
           request:
             parameters:
               id: true
@@ -117,6 +131,7 @@ functions:
       - http:
           method: DELETE
           path: /rqsts/{id}
+          private: true
           request:
             parameters:
               id: true
@@ -126,6 +141,7 @@ functions:
       - http:
           method: PUT
           path: /rqsts/{id}
+          private: true
           request:
             parameters:
               id: true
@@ -135,18 +151,21 @@ functions:
       - http:
           method: POST
           path: /send
+          private: true
   sendHealthcheck:
     handler: src/send/sendHealthcheck.handler
     events:
       - http:
           method: GET
           path: /send
+          private: true
   validateAndPush:
     handler: src/push/push.handler
     events:
       - http:
           method: POST
           path: /push
+          private: true
 resources:
   # DynamoDB
   - ${file(resources/dynamodb.yml)}
