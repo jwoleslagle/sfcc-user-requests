@@ -1,12 +1,12 @@
 service: sfcc-user-requests
 custom:
-  dynamodb:
+  dynamodb: #for local db only
     start:
       port: 8000
       migrate: true #creates table fresh with each run
       inMemory: true
     onStart: true
-  assets:
+  assets: #for S3 bucket deployments
     auto: true
     targets:
       - bucket: 
@@ -20,7 +20,7 @@ provider:
   region: us-east-1
   stage: beta
   api-keys:
-    - sfcc-csr-apikey
+    - ${self:provider.stage}-sfcc-csr-apikey
   environment:
     REQUESTS_TABLE: ${self:service}-${self.opt, self:provider.stage}-rqsts
     WEBAPP_BUCKET:
@@ -28,10 +28,10 @@ provider:
     S3_UPLOAD_BUCKET:
       Ref: UploadsBucket
     API_INVOKE_URL: https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta
+    API_KEY1: ${self.provider.api-keys[0]}
     SRC_EMAIL: jwoleslagle@gmail.com
     DEST_EMAIL: jwoleslagle@gmail.com
     SES_REGION: ${self:provider.region}
-    API_KEY: SET_THIS_API_KEY_FOR_PRODUCTION
   stackTags: # Tags to comply with Cloud Engineering requirements
     owner: jeffrey.woleslagle@hbc.com
     environment: production

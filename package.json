@@ -1,5 +1,5 @@
 {
-  "name": "sls-demo",
+  "name": "sfcc-user-requests-backend",
   "version": "1.0.0",
   "description": "",
   "main": "handler.js",

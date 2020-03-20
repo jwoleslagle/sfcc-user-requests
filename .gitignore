@@ -5,3 +5,7 @@ jspm_packages
 # Serverless directories
 .serverless
 .dynamodb
+
+# Signature files
+ecs/key.pem
+ecs/certificate.pem

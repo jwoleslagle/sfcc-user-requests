@@ -1,4 +1,19 @@
-#!/bin/sh
+#!/bin/bash
+
+#######################################
+# SFCC CSR Bulk User Add script
+#
+# Purpose: Authenticate SFCC-CI and translate 
+# request entries from DynamoDB into SFCC-CI commands 
+#
+# Created: 3/20/2020
+# Updated: 3/20/2020
+# 
+# Author: Jeff Woleslagle (jeffrey.woleslagle@hbc.com)
+#
+# TODO: Create timeout lambda / API route. Test extensively.
+#
+#######################################
 
 #Global variables
 SFCC_CI_KEY='9ea5c0b3-3dad-4338-a762-c7d760ec7d88'
@@ -7,19 +22,10 @@ API_ENDPOINT_URL='https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta/rq
 API_KEY='SET_THIS_API_KEY_FOR_PRODUCTION'
 TIMESTAMP=`date --iso-8601=seconds`
 
-#ADDFILE items will be given AM and instance roles, DELFILE items will be removed entirely, and PUTFILE will contain status updates for items that changed  
-ADDALL_FILE=.ADDALL_$TIMESTAMP.json
-ADDINST_FILE=.ADDINST_$TIMESTAMP.json
-DELALL_FILE=.DEL_$TIMESTAMP.json
-UPDATE_FILE=.PUT_$TIMESTAMP.json
-# date +"%Y%m%d"
-
-# POSSIBLE STATUSES
-# `ADD_ALL` - Account Manager user, AM Role, and Instance Role will be added. If user exists, AM and Inst roles will be added.
-# `DEL_ALL` - User will be removed from Account Manager, and all Instance Roles will be removed.
-# `ADD_INST` - Instance Role(s) for the user will be added.
-# `ERROR` - An error was encountered. No further processing will occur.
-# `COMPLETED` - User has been added to AM and given all roles. No further processing will occur.  
+ADDALL_FILE=.ADDALL_$TIMESTAMP.json #ADDALL_FILE items will be given AM and instance roles
+ADDINST_FILE=.ADDINST_$TIMESTAMP.json #ADDINST_FILE items will be given instance roles
+DELALL_FILE=.DEL_$TIMESTAMP.json #DELALL_FILE items will be removed entirely
+TIMEOUT_FILE=.TIMEOUT_$TIMESTAMP.json #TIMEOUT_FILE items will be set to TIMEOUT status (requests older than 30 days)
 
 # This logfile will contain results from the wget attempts
 LOGFILE=wget_$TIMESTAMP.log
@@ -29,63 +35,136 @@ ADDALL_URL=$API_ENDPOINT_URL/add/all
 ADDINST_URL=$API_ENDPOINT_URL/add/inst
 DELALL_URL=$API_ENDPOINT_URL/delete
 UPDATE_URL=$API_ENDPOINT_URL/update
+TIMEOUT_URL=$API_ENDPOINT_URL/timeout
 
-# get ADDs and DELETEs and #backfill into a variable
-wget $ADDALL_URL -O $ADDALL_FILE -o $LOGFILE
-#toAddObj=$(<$ADDALL_FILE)
 
-wget $DELALL_URL -O $DELALL_FILE -o $LOGFILE
-#toDeleteObj=$(<$DELALL_FILE)
+# POSSIBLE STATUSES FROM DYNAMODB TABLE
+# `ADD_ALL` - Account Manager user will be added. If user exists, AM and Inst roles will be added.
+# `ADD_AMROLE`- Account Manager Role will be added. If role exists, ignore and set to ADD_INST.
+# `ADD_INST` - Instance Role(s) for the user will be added. If exists, ignore and set to COMPLETED.
+# `DEL_ALL` - User will be removed from Account Manager and all Instance Roles will be removed.
+# `ERROR` - An error was encountered. No further processing will occur.
+# `COMPLETED` - User has been added to AM and given all roles. No further processing will occur.
+# `TIMEOUT` - Requests older than 30 days are set to TIMEOUT status. No further processing will occur.
 
-wget $ADDINST_URL -O $ADDINST_FILE -o $LOGFILE
-#toDeleteObj=$(<$ADDINST_FILE)
 
-# get starting counts and arrays of items to ADD and DELETE
-ADD_COUNT=`jq '.[] | .Count' $ADDFILE`
-ADD_ARRAY=`jq '.[] | .Items' $ADDFILE`
+#Function to curl a status update with the PUT method, note this must happen one at a time and that ONLY status is updateable: id is $1, new status is $2
+pushStatusUpdatetoDDB () {
+    `curl -d \'{"id": $1, "rqstStatus": $2}\' -H "Content-Type: application/json" \'x-api-key: $API_KEY \' -X PUT $API_ENDPOINT_URL/update`
+}
+# Usage: pushStatusUpdatetoDDB() ID NEW_STATUS
 
-DELETE_COUNT=`jq '.[] | .Count' $DELFILE`
-DEL_ARRAY=`jq '.[] | .Items' $DELFILE`
-
-#Authorize the client, this tries and exit(1) if it returns an 'Error' rather than an 'Authorization Succeeded' message
+#######################
+# EXECUTION STARTS HERE
+#
+# First thing: Authorize the client, this tries and exits if it returns an 'Error' rather than an 'Authorization Succeeded' message
 auth_response=`sfcc-ci client:auth $SFCC_CI_KEY $SFCC_CI_PASS`
-if [[ "$auth_response" != *"Authorization Suceeded"* ]]; then
+if [[ "$auth_response" != *"Authorization Succeeded"* ]]; then
     echo "SFCC-CI Client Authorization was not successful - check credentials."
     exit 1
 fi
 
-#Function to create a status update and append to PUT file: id is $1, new status is $2, TODO create function
-# addToStatusUpdates () {
-#     echo Hello $1
-# }
-# addToStatusUpdates ID NEW_STATUS
+#######################
+# First, let's set all requests older than 30 days to TIMEOUT
+wget $TIMEOUT_URL -O $TIMEOUT_FILE -o $LOGFILE
+TIMEOUT_COUNT=`jq '.[] | .Count' $TIMEOUT_FILE`
+TIMEOUT_ARRAY=`jq '.[] | .Items' $TIMEOUT_FILE`
 
-#Function to curl a status update with the PUT method, note this must happen one at a time and that only status is updateable: id is $1, new status is $2, TODO create function
-pushStatusUpdatetoDDB () {
-    `curl -d \'{"id": $1, "rqstStatus": $2}\' -H "Content-Type: application/json" \'x-api-key: $API_KEY \' -X PUT $API_ENDPOINT_URL/update`
+for i in "${TIMEOUT_ARRAY[@]}"
+do
+    id=`jq '.[] | .id' $i`
+    if [[ "$response" == *"succeeded"* ]]; then
+        echo `TIMEOUT (older than 30 days)- rqst id: $id.`
+        addToStatusUpdates() $id "TIMEOUT"
+    fi
+done
 
-}
-# pushStatusUpdatetoDDB ID NEW_STATUS
+#######################
+# Next, let's delete all accounts found in /delete
+wget $DELALL_URL -O $DELALL_FILE -o $LOGFILE
+DELETE_COUNT=`jq '.[] | .Count' $DELALL_FILE`
+DEL_ARRAY=`jq '.[] | .Items' $DELALL_FILE`
 
-#Function to run an sfcc-ci command for a certain status: id is $1, TODO: map all variables, create function
-# runSFCC_CICommand () {
-#     echo Hello $1
-# }
-# runSFCC_CICommand ID NEW_STATUS
+for i in "${DELALL_ARRAY[@]}"
+do
+    id=`jq '.[] | .id' $i`
+    email=`jq '.[] | .email' $i`
+    response=`sfcc-ci user:delete -o "Saks & Company LLC and its affiliates - No 2FA" -l "$email" --no-prompt`
+    responseStatus=
+    if [[ "$response" == *"succeeded"* ]]; then
+        echo `User $email deleted with rqst id: $id.`
+        addToStatusUpdates() $id "COMPLETED"
+    else
+        echo `ERROR when deleting user $email with rqst id: $id.`
+        addToStatusUpdates() $id "ERROR"
+    fi
+done
 
+#######################
+# Next, add all accounts and account manager roles found in /add/all
+wget $ADDALL_URL -O $ADDALL_FILE -o $LOGFILE
+ADDALL_COUNT=`jq '.[] | .Count' $ADDALL_FILE`
+ADDALL_ARRAY=`jq '.[] | .Items' $ADDALL_FILE`
 
-# for i in "${arrayName[@]}"
-# do
-#   : 
-#   # do whatever on $i
-# done
+# EXAMPLE JSON: {"role":"CSR","lastName":"Dodger","banner":"bdpt_prd","AMRole":"bm-user","updatedAt":"2020-03-05T18:49:51.372Z","rqstStatus":"ADD_ALL","createdAt":"2020-03-05T18:49:51.372Z","email":"roger.dodger@hbc.com","id":"18865bd0-5f12-11ea-8c4a-37f7a440c45f","firstName":"Roger"}
 
-# Template for user actions
-# sfcc-ci user:create -o "Saks & Company LLC and its affiliates" -l "joe.shmoe@hbc.com" -u '{"firstName":"Joe", "lastName":"Shmoe", "roles": ["bm-user"]}'
-# sfcc-ci user:delete --login "joe.shmoe@hbc.com" --no-prompt 
+for i in "${ADDALL_ARRAY[@]}"
+do
+    id=`jq '.[] | .id' $i`
+    firstName=`jq '.[] | .firstName' $i`
+    lastName=`jq '.[] | .lastName' $i`
+    AMRole=`jq '.[] | .AMRole' $i`
+    email=`jq '.[] | .email' $i`
+    # Add user to AM
+    respAddUser=`sfcc-ci user:create -o "Saks & Company LLC and its affiliates - No 2FA" -l "$email" -u \'{"firstName":"$firstName", "lastName":"$lastName", "roles": ["$AMRole"]}\'`
+    if [[ "$respAddUser" == *"succeeded"* ]]; then
+        echo `User $email created with rqst id: $id.`
+        pushStatusUpdatetoDDB() $id "ADD_INST"
+    elif [[ "$respAddUser" == *"user not unique"* ]]; then
+        echo `User creation with $email not completed with rqst id: $id - user already exists.`
+    else
+        echo `ERROR when creating user $email with id: $id.`
+        pushStatusUpdatetoDDB() $id "ERROR"
+    fi
+    # Add AM Role
+    respAddAMRole=`sfcc-ci role:grant -o "Saks & Company LLC and its affiliates - No 2FA" -l "$email" -r "$AMRole" -s "$banner"`
+    if [[ "$respAddAMRole" == *"succeeded"* ]]; then
+        echo `AM role $role added to $email with rqst id: $id.`
+        pushStatusUpdatetoDDB() $id "ADD_INST"
+    elif [[ "$respAddUser" == *"user not unique"* ]]; then
+        echo `AM role $role already assigned to $email with rqst id: $id.`
+        pushStatusUpdatetoDDB() $id "ADD_INST"
+    else
+        echo `ERROR when adding AM role $role to $email with id: $id.`
+        pushStatusUpdatetoDDB() $id "ERROR"
+    fi
+done
 
-# Template for AM Role Grant
-# sfcc-ci role:grant -l "joe.shmoe@hbc.com" -r "bm-user" -s "bdms_prd"
+#######################
+# Finally, add all instance roles found in /add/inst
 
-# Template for Instance role grant
-# sfcc-ci role:grant -i production-na01-hbc.demandware.net -l "joe.shmoe@hbc.com" -r "call-center"
+wget $ADDINST_URL -O $ADDINST_FILE -o $LOGFILE
+ADDINST_COUNT=`jq '.[] | .Count' $ADDINST_FILE`
+ADDINST_ARRAY=`jq '.[] | .Items' $ADDINST_FILE`
+
+for i in "${ADDINST_ARRAY[@]}"
+do
+    id=`jq '.[] | .id' $i`
+    firstName=`jq '.[] | .firstName' $i`
+    lastName=`jq '.[] | .lastName' $i`
+    instRole=`jq '.[] | .AMRole' $i`
+    email=`jq '.[] | .email' $i`
+
+    response=`sfcc-ci user:create -o "Saks & Company LLC and its affiliates - No 2FA" -l "$email" -u \'{"firstName":"$firstName", "lastName":"$lastName", "roles": ["$role"]}\'`
+    responseStatus=
+    if [[ "$response" == *"succeeded"* ]]; then
+        echo `AM role $role added to $email with rqst id: $id.`
+        addToStatusUpdates() $id "COMPLETED"
+    elif [[ "$response" == *"exists"* ]]; then
+        echo `AM role $role already assigned to $email with rqst id: $id.`
+        addToStatusUpdates() $id "COMPLETED"
+    else
+        echo `ERROR when adding AM role $role to $email with id: $id.`
+        addToStatusUpdates() $id "ERROR"
+    fi
+done
