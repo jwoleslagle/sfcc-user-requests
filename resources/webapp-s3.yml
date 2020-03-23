@@ -25,10 +25,9 @@ Resources:
             Condition:
               IpAddress:
                 aws:SourceIp:
-                #Saks VPN IP Addresses for NY, JXN, and TOR
-                - 65.243.45.31/24
-                - 209.11.217.198/24
-                - 199.85.105.7/24
+                #Okta source IPs for gateway.awshbc.io
+                - 54.227.71.155/24
+                - 18.205.180.67/24
       Bucket:
         Ref: WebAppBucket
 #Print out the name of the bucket that was created

@@ -112,6 +112,13 @@ functions:
           method: GET
           path: /rqsts/delete
           private: true
+  listTimeoutRqsts:
+    handler: src/rqsts/listStatusDelete.handler
+    events:
+      - http:
+          method: GET
+          path: /rqsts/timeout
+          private: true
   createRqsts:
     handler: src/rqsts/create.handler
     events:
