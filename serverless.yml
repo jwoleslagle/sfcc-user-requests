@@ -1,5 +1,7 @@
 service: sfcc-user-requests
 custom:
+  stage: ${opt:stage, self:provider.stage}
+  region: ${opt:region, self:provider.region}
   dynamodb: #for local db only
     start:
       port: 8000
@@ -9,28 +11,27 @@ custom:
   assets: #for S3 bucket deployments
     auto: true
     targets:
-      - bucket: 
-          Ref: WebAppBucket
-        files:
-        - source: ./src/webapp/
-          globs: '*'
+    - bucket: 
+        Ref: WebAppBucket
+      files:
+      - source: ./src/webapp/
+        globs: '*'
 provider:
   name: aws
   runtime: nodejs12.x
   region: us-east-1
-  stage: beta
-  api-keys:
-    - ${self:provider.stage}-sfcc-csr-apikey
+  stage: prod
+  apiKeys:
+  - sfcc-csr-apikey
   environment:
     REQUESTS_TABLE: ${self:service}-${self.opt, self:provider.stage}-rqsts
     WEBAPP_BUCKET:
       Ref: WebAppBucket
     S3_UPLOAD_BUCKET:
       Ref: UploadsBucket
-    API_INVOKE_URL: https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta
-    API_KEY1: ${self.provider.api-keys[0]}
-    SRC_EMAIL: jwoleslagle@gmail.com
-    DEST_EMAIL: jwoleslagle@gmail.com
+    API_INVOKE_URL: { "Fn::Join" : ["", [" https://", { "Ref" : "ApiGatewayRestApi" }, ".execute-api.${self:custom.region}.amazonaws.com/${self:custom.stage}" ] ]  }
+    SRC_EMAIL: hbcdigitalinfrastructuresupport@hbc.com
+    DEST_EMAIL: hbc-sfcc-csr-requests@hbc.com
     SES_REGION: ${self:provider.region}
   stackTags: # Tags to comply with Cloud Engineering requirements
     owner: jeffrey.woleslagle@hbc.com
