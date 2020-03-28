@@ -12,16 +12,22 @@
 # Author: Jeff Woleslagle (jeffrey.woleslagle@hbc.com)
 #
 # TODO:
+# - Pass user to user
 # - Add secrets manager support
 # - Test extensively
 #
 #######################################
 
 #Global variables
+
+#TODO REPLACE THE FOLLOWING WITH SECRETS MANAGER VARIABLES
 SFCC_CI_KEY='9ea5c0b3-3dad-4338-a762-c7d760ec7d88'
+SFCC_CI_SECRET='hbc2020!'
+SFCC_CI_USER='hbcsfcccsr@hbc.com'
 SFCC_CI_PASS='hbc2020!'
 API_ENDPOINT_URL='https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta/rqsts'
 API_KEY='SET_THIS_API_KEY_FOR_PRODUCTION'
+
 #Initially used ISO-8601, but this format has colons(:) and can't be used in file names
 TIMESTAMP=`date +%h%d%Y"UTC"%H%M%S -u`
 
@@ -55,15 +61,18 @@ pushStatusUpdatetoDDB () {
 }
 # Usage: pushStatusUpdatetoDDB() ID NEW_STATUS
 
+# Function to authenticate the client, this tries and exits if it returns an 'Error' rather than an 'Authorization Succeeded' message
+authenticateClient () {
+    auth_response=`sfcc-ci client:auth $SFCC_CI_KEY $SFCC_CI_SECRET $SFCC_CI_USER $SFCC_CI_PASS -a account.demandware.com`
+    if [[ "$auth_response" != *"Authorization Succeeded"* ]]; then
+        echo "SFCC-CI Client Authorization was not successful - check credentials."
+        exit 1
+    fi
+}
+
 #######################
 # EXECUTION STARTS HERE
-#
-# First thing: Authorize the client, this tries and exits if it returns an 'Error' rather than an 'Authorization Succeeded' message
-auth_response=`sfcc-ci client:auth $SFCC_CI_KEY $SFCC_CI_PASS`
-if [[ "$auth_response" != *"Authorization Succeeded"* ]]; then
-    echo "SFCC-CI Client Authorization was not successful - check credentials."
-    exit 1
-fi
+#######################
 
 #######################
 # First, let's set all requests older than 30 days to TIMEOUT
