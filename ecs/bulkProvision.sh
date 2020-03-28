@@ -25,8 +25,8 @@ SFCC_CI_KEY='9ea5c0b3-3dad-4338-a762-c7d760ec7d88'
 SFCC_CI_SECRET='hbc2020!'
 SFCC_CI_USER='hbcsfcccsr@hbc.com'
 SFCC_CI_PASS='hbc2020!'
-API_ENDPOINT_URL='https://op857sfym8.execute-api.us-east-1.amazonaws.com/beta/rqsts'
-API_KEY='SET_THIS_API_KEY_FOR_PRODUCTION'
+API_ENDPOINT_URL='https://9olsoh14yh.execute-api.us-east-1.amazonaws.com/prod/rqsts'
+API_KEY='6SfWv3E9g199sjuCKuwVj8KGoKIIdDLi85d03YCo'
 
 #Initially used ISO-8601, but this format has colons(:) and can't be used in file names
 TIMESTAMP=`date +%h%d%Y"UTC"%H%M%S -u`
