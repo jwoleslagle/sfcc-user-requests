@@ -21,5 +21,5 @@ RUN apk add --update \
     && rm -rf /var/cache/apk/*
 COPY bulkProvision.sh /root/bulkProvision.sh 
 RUN chmod +x /root/bulkProvision.sh
-ENTRYPOINT [ "/bin/bash", "-d" ]
+ENTRYPOINT [ "/bin/bash -d" ]
 # \ && /root/bulkProvision.sh
