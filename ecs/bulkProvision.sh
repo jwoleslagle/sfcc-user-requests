@@ -165,7 +165,7 @@ if [${ADDINST_ARRAY[@]} > 0]
         if [[ "$response" == *"succeeded"* ]]; then
             echo `AM role $role added to $email with rqst id: $id.`
             addToStatusUpdates() $id "COMPLETED"
-        elif [[ "$response" == *"exists"* ]]; then
+        elif [[ "$response" == *"No user with login"* ]]; then
             echo `AM role $role already assigned to $email with rqst id: $id.`
             addToStatusUpdates() $id "COMPLETED"
         else
