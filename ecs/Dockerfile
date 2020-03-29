@@ -21,5 +21,11 @@ RUN apk add --update \
     && rm -rf /var/cache/apk/*
 COPY bulkProvision.sh /root/bulkProvision.sh 
 RUN chmod +x /root/bulkProvision.sh
-# ENTRYPOINT /bin/bash
+RUN apk add --update openssh && \
+    mkdir -p /var/run/sshd
+EXPOSE 22
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && ln -s /usr/local/bin/docker-entrypoint.sh / # backwards compat
+ENTRYPOINT ["docker-entrypoint.sh"]
 # \ && /root/bulkProvision.sh
