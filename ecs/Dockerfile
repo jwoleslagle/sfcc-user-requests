@@ -6,11 +6,13 @@ RUN apk --update add git && \
     rm /var/cache/apk/* && \
     apk add bash && \
     apk add jq && \
+    apk add curl && \
     apk add sed
 RUN git config --global url."https://5c312e9a788e15a6946ad401d0c0d4c4121fe423:@github.com/".insteadOf "https://github.com/"   && \
     git clone https://github.com/saksdirect/sfcc-ci.git/ && \
     cd sfcc-ci && \
     npm install -g
+# Install aws-cli, which is needed for 
 RUN apk add --update \
     python \
     python-dev \
@@ -19,7 +21,6 @@ RUN apk add --update \
     && pip install awscli==1.16.310 --upgrade \
     && apk --purge -v del py-pip \
     && rm -rf /var/cache/apk/*
-COPY test.sh /root/integrationTest.sh 
-RUN chmod +x /root/integrationTest.sh
-COPY bulkProvision.sh /root/bulkProvision.sh 
-RUN chmod +x /root/bulkProvision.sh 
+# Copying integrationTest.sh and bulkProvision.sh
+COPY *.sh /root/
+RUN chmod +x /root/*.sh
