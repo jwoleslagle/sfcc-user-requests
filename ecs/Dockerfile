@@ -19,13 +19,17 @@ RUN apk add --update \
     && pip install awscli==1.16.310 --upgrade \
     && apk --purge -v del py-pip \
     && rm -rf /var/cache/apk/*
-COPY bulkProvision.sh /root/bulkProvision.sh 
-RUN chmod +x /root/bulkProvision.sh
-RUN apk add --update openssh && \
-    mkdir -p /var/run/sshd
-EXPOSE 22
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
-    && ln -s /usr/local/bin/docker-entrypoint.sh / # backwards compat
-ENTRYPOINT ["docker-entrypoint.sh"]
-# \ && /root/bulkProvision.sh
+COPY test.sh /root/test.sh 
+RUN chmod +x /root/test.sh
+
+# COPY bulkProvision.sh /root/bulkProvision.sh 
+# RUN chmod +x /root/bulkProvision.sh \ 
+#     && /root/bulkProvision.sh
+
+# RUN apk add --update openssh && \
+#     mkdir -p /var/run/sshd
+# EXPOSE 22
+# COPY docker-entrypoint.sh /usr/local/bin/
+# RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+#     && ln -s /usr/local/bin/docker-entrypoint.sh / # backwards compat
+# ENTRYPOINT ["docker-entrypoint.sh"]

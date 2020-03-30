@@ -83,7 +83,7 @@ functions:
     events:
       - http:
           method: GET
-          path: /ping
+          path: /rqsts/ping
           private: true
   listRqsts:
     handler: src/rqsts/list.handler
