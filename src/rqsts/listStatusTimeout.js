@@ -2,8 +2,8 @@ const dynamoDB = require('../dynamodb');
 
 module.exports.handler=async(evt, ctx) =>{
     const date = new Date();
-    date.setDate(date.getDate()-30);
-    const monthAgo = date.toISOString();
+    date.setDate(date.getDate()-7);
+    const SevenDaysAgo = date.toISOString();
     
     try{
         const results = await dynamoDB.query({
@@ -12,7 +12,7 @@ module.exports.handler=async(evt, ctx) =>{
             KeyConditionExpression: "rqstStatus NOT IN (:v_error, :v_completed)",
             ConditionExpression: "createdAt <= :v_from",
             ExpressionAttributeValues: {
-                ":v_from": monthAgo,
+                ":v_from": SevenDaysAgo,
                 ":v_completed": "COMPLETED",
                 ":v_error": "ERROR"
             }

@@ -18,15 +18,79 @@
 #
 #######################################
 
-#Global variables
+#Set global variables from those stored in AWS Secrets Manager
 
-#TODO REPLACE THE FOLLOWING WITH SECRETS MANAGER VARIABLES
-SFCC_CI_KEY='9ea5c0b3-3dad-4338-a762-c7d760ec7d88'
-SFCC_CI_SECRET='hbc2020!'
-SFCC_CI_USER='hbcsfcccsr@hbc.com'
-SFCC_CI_PASS='hbc2020!'
-API_ENDPOINT_URL='https://9olsoh14yh.execute-api.us-east-1.amazonaws.com/prod/rqsts'
-API_KEY='6SfWv3E9g199sjuCKuwVj8KGoKIIdDLi85d03YCo'
+sm_json=`aws secretsmanager get-secret-value --secret-id prod/sfcc-requests --version-stage AWSCURRENT | jq -rc .SecretString`
+
+getSMVariable () {
+    echo $sm_json | jq .$1 | sed -e 's/^"//' -e 's/"$//'
+}
+
+SFCC_CI_KEY=`getSMVariable "SFCC_CI_KEY"`
+SFCC_CI_SECRET=`getSMVariable "SFCC_CI_SECRET"`
+SFCC_CI_USER=`getSMVariable "SFCC_CI_USER"`
+SFCC_CI_PASS=`getSMVariable "SFCC_CI_PASS"`
+API_ENDPOINT_URL=`getSMVariable "API_ENDPOINT_URL"`
+API_KEY=`getSMVariable "API_KEY"`
+
+# These three functions test to make sure we can connect to all required components, and exit 1 if not.
+secretsMgrTest () {
+    sm_response=`aws secretsmanager get-secret-value --secret-id prod/sfcc-requests --version-stage AWSCURRENT | jq -rc .SecretString | jq .ping | sed -e 's/^"//' -e 's/"$//'`
+    if [[ $sm_response == *"pong"* ]]; then
+        sm_response_status="OK"
+        echo $sm_response_status
+    else
+        sm_response_status="FAIL"
+        echo $sm_response_status
+        echo $sm_response
+    fi
+}
+
+apiConnection () {
+    api_response=`curl -s -H "Content-Type: application/json" -H "x-api-key: $API_KEY" -X GET $API_ENDPOINT_URL/ping | jq .message | sed -e 's/^"//' -e 's/"$//'`
+    if [[ $api_response == *"Pong"* ]]; then
+        api_response_status="OK"
+        echo $api_response_status
+    else
+        api_response_status="FAIL"
+        echo $api_response_status
+        echo $api_response
+    fi
+}
+
+sfccCIAuth () {
+    auth_response=`sfcc-ci client:auth $SFCC_CI_KEY $SFCC_CI_SECRET $SFCC_CI_USER $SFCC_CI_PASS -a account.demandware.com`
+    if [[ $auth_response == *"Authentication succeeded"* ]]; then
+        auth_response_status="OK"
+        echo $auth_response_status
+    else
+        auth_response_status="FAIL"
+        echo $auth_response_status
+        echo $auth_response 
+    fi
+}
+
+## Test all critical connections - exit if unable to connect
+
+echo "Testing Secrets Manager configuration... "
+sm_result="$(secretsMgrTest)"
+echo $sm_result
+
+echo "Testing API connection... "
+api_result="$(apiConnection)"
+echo $api_result
+
+echo "Testing SFCC-CI Authentication... "
+sfcc_result="$(sfccCIAuth)"
+echo $sfcc_result
+
+if [[ $sm_result == "OK" ]] && [[ $api_result == "OK" ]] && [[ $sfcc_result == "OK" ]];
+then
+    echo "All critical processes connected OK. Continuing..."
+else
+    echo "One or more critical processes failed to connect. Exiting..."
+    exit 1
+fi
 
 #Initially used ISO-8601, but this format has colons(:) and can't be used in file names
 TIMESTAMP=`date +%h%d%Y"UTC"%H%M%S -u`
@@ -59,7 +123,7 @@ TIMEOUT_URL=$API_ENDPOINT_URL/timeout
 pushStatusUpdatetoDDB () {
     `curl -d \'{"id": $1, "rqstStatus": $2}\' -H "Content-Type: application/json" \'x-api-key: $API_KEY \' -X PUT $API_ENDPOINT_URL/update`
 }
-# Usage: pushStatusUpdatetoDDB() ID NEW_STATUS
+# Usage: pushStatusUpdatetoDDB ID NEW_STATUS
 
 # Function to authenticate the client, this tries and exits if it returns an 'Error' rather than an 'Authorization Succeeded' message
 authenticateClient () {
@@ -80,23 +144,25 @@ wget $TIMEOUT_URL -O $TIMEOUT_FILE -o $LOGFILE
 TIMEOUT_COUNT=`jq '.[] | .Count' $TIMEOUT_FILE`
 TIMEOUT_ARRAY=`jq '.[] | .Items' $TIMEOUT_FILE`
 
-if [${TIMEOUT_ARRAY[@]} > 0]
+if [ ${TIMEOUT_COUNT} -gt 0 ];
+then
     for i in "${TIMEOUT_ARRAY[@]}"
     do
         id=`jq '.[] | .id' $i`
         echo `TIMEOUT (older than 30 days)- rqst id: $id.`
-        addToStatusUpdates() $id "TIMEOUT"
+        addToStatusUpdates $id "TIMEOUT"
     done
 fi
 
 #######################
 # Next, let's delete all accounts found in /delete
 wget $DELALL_URL -O $DELALL_FILE -o $LOGFILE
-DELETE_COUNT=`jq '.[] | .Count' $DELALL_FILE`
+DEL_COUNT=`jq '.[] | .Count' $DELALL_FILE`
 DEL_ARRAY=`jq '.[] | .Items' $DELALL_FILE`
 
-if [${DELALL_ARRAY[@]} > 0]
-    for i in "${DELALL_ARRAY[@]}"
+if [ ${DEL_COUNT} -gt 0 ];
+then
+    for i in "${DEL_ARRAY[@]}"
     do
         id=`jq '.[] | .id' $i`
         email=`jq '.[] | .email' $i`
@@ -104,10 +170,10 @@ if [${DELALL_ARRAY[@]} > 0]
         responseStatus=
         if [[ "$response" == *"succeeded"* ]]; then
             echo `User $email deleted with rqst id: $id.`
-            addToStatusUpdates() $id "COMPLETED"
+            addToStatusUpdates $id "COMPLETED"
         else
             echo `ERROR when deleting user $email with rqst id: $id.`
-            addToStatusUpdates() $id "ERROR"
+            addToStatusUpdates $id "ERROR"
         fi
     done
 fi
@@ -119,7 +185,8 @@ ADDALL_COUNT=`jq '.[] | .Count' $ADDALL_FILE`
 ADDALL_ARRAY=`jq '.[] | .Items' $ADDALL_FILE`
 
 # EXAMPLE JSON: {"role":"CSR","lastName":"Dodger","banner":"bdpt_prd","AMRole":"bm-user","updatedAt":"2020-03-05T18:49:51.372Z","rqstStatus":"ADD_ALL","createdAt":"2020-03-05T18:49:51.372Z","email":"roger.dodger@hbc.com","id":"18865bd0-5f12-11ea-8c4a-37f7a440c45f","firstName":"Roger"}
-if [${ADDALL_ARRAY[@]} > 0]
+if [ ${ADDALL_COUNT} -gt 0 ];
+then
     for i in "${ADDALL_ARRAY[@]}"
     do
         id=`jq '.[] | .id' $i`
@@ -131,24 +198,24 @@ if [${ADDALL_ARRAY[@]} > 0]
         respAddUser=`sfcc-ci user:create -o "Saks & Company LLC and its affiliates - No 2FA" -l "$email" -u \'{"firstName":"$firstName", "lastName":"$lastName", "roles": ["$AMRole"]}\'`
         if [[ "$respAddUser" == *"succeeded"* ]]; then
             echo `User $email created with rqst id: $id.`
-            pushStatusUpdatetoDDB() $id "ADD_INST"
+            pushStatusUpdatetoDDB $id "ADD_INST"
         elif [[ "$respAddUser" == *"user not unique"* ]]; then
             echo `User creation with $email not completed with rqst id: $id - user already exists.`
         else
             echo `ERROR when creating user $email with id: $id.`
-            pushStatusUpdatetoDDB() $id "ERROR"
+            pushStatusUpdatetoDDB $id "ERROR"
         fi
         # Add AM Role
         respAddAMRole=`sfcc-ci role:grant -o "Saks & Company LLC and its affiliates - No 2FA" -l "$email" -r "$AMRole" -s "$banner"`
         if [[ "$respAddAMRole" == *"succeeded"* ]]; then
             echo `AM role $role added to $email with rqst id: $id.`
-            pushStatusUpdatetoDDB() $id "ADD_INST"
+            pushStatusUpdatetoDDB $id "ADD_INST"
         elif [[ "$respAddUser" == *"user not unique"* ]]; then
             echo `AM role $role already assigned to $email with rqst id: $id.`
-            pushStatusUpdatetoDDB() $id "ADD_INST"
+            pushStatusUpdatetoDDB $id "ADD_INST"
         else
             echo `ERROR when adding AM role $role to $email with id: $id.`
-            pushStatusUpdatetoDDB() $id "ERROR"
+            pushStatusUpdatetoDDB $id "ERROR"
         fi
     done
 fi
@@ -160,7 +227,8 @@ wget $ADDINST_URL -O $ADDINST_FILE -o $LOGFILE
 ADDINST_COUNT=`jq '.[] | .Count' $ADDINST_FILE`
 ADDINST_ARRAY=`jq '.[] | .Items' $ADDINST_FILE`
 
-if [${ADDINST_ARRAY[@]} > 0]
+if [ ${ADDINST_COUNT} -gt 0 ];
+then
     for i in "${ADDINST_ARRAY[@]}"
     do
         id=`jq '.[] | .id' $i`
@@ -173,13 +241,13 @@ if [${ADDINST_ARRAY[@]} > 0]
         responseStatus=
         if [[ "$response" == *"succeeded"* ]]; then
             echo `AM role $role added to $email with rqst id: $id.`
-            addToStatusUpdates() $id "COMPLETED"
+            addToStatusUpdates $id "COMPLETED"
         elif [[ "$response" == *"No user with login"* ]]; then
             echo `AM role $role already assigned to $email with rqst id: $id.`
-            addToStatusUpdates() $id "COMPLETED"
+            addToStatusUpdates $id "COMPLETED"
         else
             echo `ERROR when adding AM role $role to $email with id: $id.`
-            addToStatusUpdates() $id "ERROR"
+            addToStatusUpdates $id "ERROR"
         fi
     done
 fi
