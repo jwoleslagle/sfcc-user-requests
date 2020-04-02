@@ -7,12 +7,9 @@
 # and translate request entries from DynamoDB into SFCC-CI commands 
 #
 # Created: 3/20/2020
-# Updated: 3/23/2020
+# Updated: 4/1/2020
 # 
 # Author: Jeff Woleslagle (jeffrey.woleslagle@hbc.com)
-#
-# TODO:
-# - Test extensively
 #
 #######################################
 
@@ -105,11 +102,14 @@ TIMEOUT_FILE="test_timeout.json" #TIMEOUT_FILE items will be set to TIMEOUT stat
 #LOGFILE=wget_$TIMESTAMP.log
 
 # wget download urls
-ADDALL_URL=$API_ENDPOINT_URL/add/all
-ADDINST_URL=$API_ENDPOINT_URL/add/inst
-DELALL_URL=$API_ENDPOINT_URL/delete
-UPDATE_URL=$API_ENDPOINT_URL/update
-TIMEOUT_URL=$API_ENDPOINT_URL/timeout
+ADDALL_URL="$API_ENDPOINT_URL/list/add_all"
+ADDINST_URL="$API_ENDPOINT_URL/list/add_inst"
+DELALL_URL="$API_ENDPOINT_URL/list/del_all"
+TOTIMEOUT_URL="$API_ENDPOINT_URL/list/created?daysAgo=30"
+TOSTALE_URL="$API_ENDPOINT_URL/list/updated?daysAgo=7"
+STALE_URL="$API_ENDPOINT_URL/list/stale"   #stale requests have ADD_INST status for more than 7 days - reset to ADD_ALL
+TIMEOUT_URL="$API_ENDPOINT_URL/list/timeout" #timeout requests are given TIMEOUT status
+UPDATE_URL="$API_ENDPOINT_URL/update"
 
 # POSSIBLE STATUSES FROM DYNAMODB TABLE
 # `ADD_ALL` - Account Manager user will be added. If user exists, AM and Inst roles will be added.
@@ -117,17 +117,38 @@ TIMEOUT_URL=$API_ENDPOINT_URL/timeout
 # `ADD_INST` - Instance Role(s) for the user will be added. If exists, ignore and set to COMPLETED.
 # `DEL_ALL` - User will be removed from Account Manager and all Instance Roles will be removed.
 # `ERROR` - An error was encountered. No further processing will occur.
+# `STALE` - An ADD_INST request that is over 7 days old and must be deleted and returned to ADD_ALL status. SFCC invites are only good for 7 days.
 # `COMPLETED` - User has been added to AM and given all roles. No further processing will occur.
 # `TIMEOUT` - Requests older than 30 days are set to TIMEOUT status. No further processing will occur.
 
-#Function to curl a status update with the PUT method, note this must happen one at a time and that ONLY status is updateable: id is $1, new status is $2
+#Function to curl a status update with the PUT method, note this must happen one at a time and that ONLY status is updateable.
+# Usage: $(pushStatusUpdatetoDDB) ID NEW_STATUS
 pushStatusUpdatetoDDB () {
     pushCmd="curl -s -d '{\"id\": \"$1\", \"rqstStatus\": \"$2\"}\' -H \"Content-Type: application/json\" -H \"x-api-key: $API_KEY\" -X PUT $API_ENDPOINT_URL/update"
     echo $pushCmd
     pushResponse=`$pushCmd`
     echo $pushResponse
 }
-# Usage: pushStatusUpdatetoDDB ID NEW_STATUS
+
+# Function to delete users - this action was split into a function because it's used by the commands used on multiple statuses (DEL_ALL, STALE, and TIMEOUT).
+# Usage: $(deleteAll) EMAIL ID NEW_STATUS
+deleteAll () { 
+    response=`sfcc-ci user:delete -l "$1" --no-prompt`   
+    # First, make sure our auth hasn't expired and, if so, retry after reauth.
+    if [[ "$response" == *"Authentication invalid"* ]]; then
+        $(authenticateClient)
+        # retry after re-authentication
+        response=`sfcc-ci user:delete -l "$1" --no-prompt`
+    fi
+
+    if [[ "$response" == *"succeeded"* ]]; then
+        echo `User $1 deleted with rqst id: $2 . Changing status to $3 .`
+        addToStatusUpdates $2 $3
+    else
+        echo `ERROR when deleting user $1 with rqst id: $2.`
+        addToStatusUpdates $2 "ERROR"
+    fi
+}
 
 # Function to authenticate the client, this tries and exits if it returns an 'Error' rather than an 'Authorization Succeeded' message
 authenticateClient () {
@@ -141,24 +162,45 @@ authenticateClient () {
 #######################
 # First, let's set all requests older than 30 days to TIMEOUT
 runTimeoutCmd () {
-    #wget $TIMEOUT_URL -O $TIMEOUT_FILE -o $LOGFILE
-    TIMEOUT_COUNT=`jq '.[] | .Count' $TIMEOUT_FILE`
-    TIMEOUT_ARRAY=`jq '.[] | .Items' $TIMEOUT_FILE`
+    #wget $TOTIMEOUT_URL -O $TIMEOUT_FILE -o $LOGFILE
+    TOTIMEOUT_COUNT=`jq '.[] | .Count' $TOTIMEOUT_FILE`
+    TOTIMEOUT_ARRAY=`jq '.[] | .Items' $TOTIMEOUT_FILE`
 
-    if [ ${TIMEOUT_COUNT} -gt 0 ];
+    if [ ${TOTIMEOUT_COUNT} -gt 0 ];
     then
-        for i in "${TIMEOUT_ARRAY[@]}"
+        for i in "${TOTIMEOUT_ARRAY[@]}"
         do
             id=`echo $i | jq '.[] | .id' | sed -e 's/^"//' -e 's/"$//'`
-            echo "TIMEOUT (older than 30 days)- rqst id: $id"
-            pushStatusUpdatetoDDB $id "TIMEOUT"
+            echo "TIMEOUT (created 30+ days ago)- rqst id: $id"
+            newStatus="TIMEOUT"
+            $(deleteAll) $email $id $newStatus
         done
     fi
 }
 
+#######################
+# Second, let's set all requests older than 7 days to STALE, then delete the account and set the request status to ADD_ALL. Stale status needs a reset since requests older than 7 days require a new authorization email from SFCC.
+runStaleCmd () {
+    #wget $TOSTALE_URL -O $TIMEOUT_FILE -o $LOGFILE
+    TOSTALE_COUNT=`jq '.[] | .Count' $TOSTALE_FILE`
+    TOSTALE_ARRAY=`jq '.[] | .Items' $TOSTALE_FILE`
+
+    if [ ${TOSTALE_COUNT} -gt 0 ];
+    then
+        for i in "${TOSTALE_ARRAY[@]}"
+        do
+            id=`echo $i | jq '.[] | .id' | sed -e 's/^"//' -e 's/"$//'`
+            email=`echo $i | jq '.[] | .email' | sed -e 's/^"//' -e 's/"$//'`
+            echo "STALE (updated 7+ days ago)- rqst id: $id"
+            pushStatusUpdatetoDDB $id "STALE"
+            newStatus="ADD_ALL"
+            $(deleteAll) $email $id $newStatus
+        done
+    fi
+}
 
 #######################
-# Second, let's delete all accounts found in /delete
+# Third, let's delete all accounts found in /delete
 runDeleteAllCmd () {
     # wget $DELALL_URL -O $DELALL_FILE -o $LOGFILE
     DEL_COUNT=`jq '.[] | .Count' $DELALL_FILE`
@@ -168,32 +210,17 @@ runDeleteAllCmd () {
     then
         for i in "${DEL_ARRAY[@]}"
         do
-            id=`echo $i | jq '.[] | .id' | sed -e 's/^"//' -e 's/"$//'`
             email=`echo $i | jq '.[] | .email' | sed -e 's/^"//' -e 's/"$//'`
-            response=`sfcc-ci user:delete -l "$email" --no-prompt`
-            
-            # First, make sure our auth hasn't expired and, if so, retry after reauth.
-            if [[ "$response" == *"Authentication invalid"* ]]; then
-                $(authenticateClient)
-                # retry after re-authentication
-                response=`sfcc-ci user:delete -l "$email" --no-prompt`
-            fi
-
-            if [[ "$response" == *"succeeded"* ]]; then
-                echo `User $email deleted with rqst id: $id.`
-                addToStatusUpdates $id "COMPLETED"
-            else
-                echo `User $email deleted with rqst id: $id.`
-                addToStatusUpdates $id "COMPLETED"
-                echo `ERROR when deleting user $email with rqst id: $id.`
-                addToStatusUpdates $id "ERROR"
-            fi
+            id=`echo $i | jq '.[] | .id' | sed -e 's/^"//' -e 's/"$//'`
+            newStatus="COMPLETED"
+            $(deleteAll) $email $id $newStatus
         done
     fi
 }
 
+
 # #######################
-# # Third, add all accounts and account manager roles found in /add/all
+# # Fifth, add all accounts and account manager roles found in /add/all
 runAddAllCmd () {
     # wget $ADDALL_URL -O $ADDALL_FILE -o $LOGFILE
     ADDALL_COUNT=`jq '.[] | .Count' $ADDALL_FILE`
@@ -284,6 +311,7 @@ runAddInstCmd () {
 # Sequence is important for deletes - IAM team has been told that to revoke instance roles, they should DELALL then re-add. So, deletes are always processed first.
 
 #runTimeoutCmd
+#runStaleCmd
 #runDeleteAllCmd 
 runAddAllCmd
 #runAddInstCmd

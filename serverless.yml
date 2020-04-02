@@ -113,12 +113,33 @@ functions:
           method: GET
           path: /rqsts/delete
           private: true
+  list30DaysOld:
+    handler: src/rqsts/list30DaysOld.handler
+    events:
+      - http:
+          method: GET
+          path: /rqsts/list30DaysOld
+          private: true
+  list7DaysOld:
+    handler: src/rqsts/list7DaysOld.handler
+    events:
+      - http:
+          method: GET
+          path: /rqsts/list7DaysOld
+          private: true
   listTimeoutRqsts:
-    handler: src/rqsts/listStatusDelete.handler
+    handler: src/rqsts/listStatusTimeout.handler
     events:
       - http:
           method: GET
           path: /rqsts/timeout
+          private: true
+  listStaleRqsts:
+    handler: src/rqsts/listStatusStale.handler
+    events:
+      - http:
+          method: GET
+          path: /rqsts/stale
           private: true
   createRqsts:
     handler: src/rqsts/create.handler

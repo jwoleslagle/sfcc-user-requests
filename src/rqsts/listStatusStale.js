@@ -7,7 +7,7 @@ module.exports.handler=async(evt, ctx) =>{
             IndexName: "rqstStatus",
             KeyConditionExpression: "rqstStatus = :v_rqstStatus",
             ExpressionAttributeValues: {
-                ":v_rqstStatus": "TIMEOUT"
+                ":v_rqstStatus": "STALE"
             }
         }).promise();
         return {
