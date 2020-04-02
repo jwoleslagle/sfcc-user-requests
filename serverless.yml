@@ -97,49 +97,49 @@ functions:
     events:
       - http:
           method: GET
-          path: /rqsts/add/all
+          path: /rqsts/list/add_all
           private: true
   listAddInstRqsts:
     handler: src/rqsts/listStatusAddInst.handler
     events:
       - http:
           method: GET
-          path: /rqsts/add/inst
+          path: /rqsts/list/add_inst
           private: true
   listDeleteRqsts:
     handler: src/rqsts/listStatusDelete.handler
     events:
       - http:
           method: GET
-          path: /rqsts/delete
+          path: /rqsts/list/del_all
           private: true
-  list30DaysOld:
-    handler: src/rqsts/list30DaysOld.handler
+  listRqstsByUpdated:
+    handler: src/rqsts/listByUpdated.handler
     events:
       - http:
           method: GET
-          path: /rqsts/list30DaysOld
+          path: /rqsts/list/updated
           private: true
-  list7DaysOld:
-    handler: src/rqsts/list7DaysOld.handler
+  listRqstsByCreated:
+    handler: src/rqsts/listByCreated.handler
     events:
       - http:
           method: GET
-          path: /rqsts/list7DaysOld
+          path: /rqsts/list/created
           private: true
   listTimeoutRqsts:
     handler: src/rqsts/listStatusTimeout.handler
     events:
       - http:
           method: GET
-          path: /rqsts/timeout
+          path: /rqsts/list/timeout
           private: true
   listStaleRqsts:
     handler: src/rqsts/listStatusStale.handler
     events:
       - http:
           method: GET
-          path: /rqsts/stale
+          path: /rqsts/list/stale
           private: true
   createRqsts:
     handler: src/rqsts/create.handler

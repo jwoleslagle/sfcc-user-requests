@@ -85,17 +85,17 @@ else
     exit 1
 fi
 
-#Initially used ISO-8601, but this format has colons(:) and can't be used in file names
-TIMESTAMP=`date +%h%d%Y"UTC"%H%M%S -u`
-
+TIMESTAMP=`date +%h%d%Y"UTC"%H%M%S -u` #Initially used ISO-8601, but this format has colons(:) and can't be used in file names
 # ADDALL_FILE=.ADDALL_$TIMESTAMP.json #ADDALL_FILE items will be given AM and instance roles
 # ADDINST_FILE=.ADDINST_$TIMESTAMP.json #ADDINST_FILE items will be given instance roles
 # DELALL_FILE=.DEL_$TIMESTAMP.json #DELALL_FILE items will be removed entirely
+# STALE_FILE=.STALE_$TIMESTAMP.json #STALE items should be deleted and reset to ADD_ALL status. This file should always be empty - this is just added to improve resilency.
 # TIMEOUT_FILE=.TIMEOUT_$TIMESTAMP.json #TIMEOUT_FILE items will be set to TIMEOUT status (requests older than 30 days)
 
 ADDALL_FILE="test_addAll.json" #ADDALL_FILE items will be given AM and instance roles
 ADDINST_FILE="test_addInst.json" #ADDINST_FILE items will be given instance roles
 DELALL_FILE="test_delAll.json" #DELALL_FILE items will be removed entirely
+STALE_FILE="test_stale.json" #STALE items should be deleted and reset to ADD_ALL status
 TIMEOUT_FILE="test_timeout.json" #TIMEOUT_FILE items will be set to TIMEOUT status (requests older than 30 days)
 
 # This logfile will contain results from the wget attempts
@@ -108,7 +108,6 @@ DELALL_URL="$API_ENDPOINT_URL/list/del_all"
 TOTIMEOUT_URL="$API_ENDPOINT_URL/list/created?daysAgo=30"
 TOSTALE_URL="$API_ENDPOINT_URL/list/updated?daysAgo=7"
 STALE_URL="$API_ENDPOINT_URL/list/stale"   #stale requests have ADD_INST status for more than 7 days - reset to ADD_ALL
-TIMEOUT_URL="$API_ENDPOINT_URL/list/timeout" #timeout requests are given TIMEOUT status
 UPDATE_URL="$API_ENDPOINT_URL/update"
 
 # POSSIBLE STATUSES FROM DYNAMODB TABLE
@@ -161,7 +160,7 @@ authenticateClient () {
 
 #######################
 # First, let's set all requests older than 30 days to TIMEOUT
-runTimeoutCmd () {
+runToTimeoutCmd () {
     #wget $TOTIMEOUT_URL -O $TIMEOUT_FILE -o $LOGFILE
     TOTIMEOUT_COUNT=`jq '.[] | .Count' $TOTIMEOUT_FILE`
     TOTIMEOUT_ARRAY=`jq '.[] | .Items' $TOTIMEOUT_FILE`
@@ -180,7 +179,7 @@ runTimeoutCmd () {
 
 #######################
 # Second, let's set all requests older than 7 days to STALE, then delete the account and set the request status to ADD_ALL. Stale status needs a reset since requests older than 7 days require a new authorization email from SFCC.
-runStaleCmd () {
+runToStaleCmd () {
     #wget $TOSTALE_URL -O $TIMEOUT_FILE -o $LOGFILE
     TOSTALE_COUNT=`jq '.[] | .Count' $TOSTALE_FILE`
     TOSTALE_ARRAY=`jq '.[] | .Items' $TOSTALE_FILE`
@@ -308,10 +307,11 @@ runAddInstCmd () {
 
 # The following runs the above functions in order.
 
-# Sequence is important for deletes - IAM team has been told that to revoke instance roles, they should DELALL then re-add. So, deletes are always processed first.
+# Sequence is important for deletes - IAM team has been told that to revoke instance roles, they should DEL_ALL then re-add. So, deletes are always processed first.
 
-#runTimeoutCmd
-#runStaleCmd
+#runToTimeoutCmd
+#runToStaleCmd
 #runDeleteAllCmd 
+#runStaleCmd
 runAddAllCmd
 #runAddInstCmd
