@@ -1,5 +1,5 @@
-# sfcc-user-requests-backend
-A backend for SFCC user access requests, integrating a DynamoDB table with RESTful API endpoints and various helper lambdas. 
+# sfcc-user-requests
+A process for automating SFCC user access requests, integrating a DynamoDB table with RESTful API endpoints and various helper lambdas. Currently this is limited to CSR user requests, but could be expanded to other roles easily.
 
 This project was necessitated by SFCC handling of user creation and provisioning, which requires a low-level API wrapper (called SFCC-CI) where the account manager user is created and the account manager role is granted, and a manual step whereby the end user must log in and provide a password before the instance role can be granted. Password generation, i.e. setting a default password, cannot be done programmatically). Additionally, the business manager side of SFCC (which contains the job scheduler) cannot interact with account manager, which is where user accounts are provisioned and stored. 
 
@@ -14,7 +14,7 @@ Running costs for several thousand requests / month were estimated to be about $
 
 ## Data flow
 
-	![sfcc data flow diagram](./images/sfcc-requests-data-flow.png)
+	![sfcc data flow diagram](/images/sfcc-requests-data-flow.png)
 
 ## Setup
 The core of the application (including the webapp, lambdas, API gateway, and DynamoDB table) is deployed with a single command via the Serverless Framework- a versatile, cloud-agnostic framework that, when configured to use AWS, works as a wrapper for CloudFormation templates. 
