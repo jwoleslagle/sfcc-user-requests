@@ -22,5 +22,5 @@ RUN apk add --update \
     && apk --purge -v del py-pip \
     && rm -rf /var/cache/apk/*
 # Copying integrationTest.sh and bulkProvision.sh
-COPY *.sh /root/
-RUN chmod +x /root/*.sh
+COPY bulkProvision.sh /root/
+RUN chmod +x /root/bulkProvision.sh

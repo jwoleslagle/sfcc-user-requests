@@ -71,8 +71,9 @@ provider:
     Action:
       - ses:SendEmail
       - ses:SendRawEmail
-    # This should be changed for go-live
-    Resource: "arn:aws:ses:us-east-1:636338013835:identity/jwoleslagle@gmail.com"
+    # This may need to be changed if not using HBC-infrastructure
+    Resource: "arn:aws:ses:us-east-1:636338013835:identity/	
+hbcdigitalinfrastructuresupport@hbc.com"
 plugins:
   - serverless-offline
   - serverless-dynamodb-local
@@ -198,6 +199,13 @@ functions:
           method: POST
           path: /push
           private: true
+      # This should kick off the lambda when an object is created - didn't have time to test.
+      # - s3:
+      #   bucket: 
+      #     Ref: UploadsBucket
+      #   event: s3:ObjectCreated:*
+      #   rules:
+      #   - prefix: upload/
 resources:
   # DynamoDB
   - ${file(resources/dynamodb.yml)}
