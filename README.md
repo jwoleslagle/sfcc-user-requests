@@ -14,7 +14,7 @@ Running costs for several thousand requests / month were estimated to be about $
 
 ## Data flow
 
-	![sfcc data flow diagram](/images/sfcc-requests-data-flow.png)
+![sfcc data flow diagram](/images/sfcc-requests-data-flow.png)
 
 ## Setup
 The core of the application (including the webapp, lambdas, API gateway, and DynamoDB table) is deployed with a single command via the Serverless Framework- a versatile, cloud-agnostic framework that, when configured to use AWS, works as a wrapper for CloudFormation templates. 
