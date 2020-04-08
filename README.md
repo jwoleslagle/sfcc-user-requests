@@ -7,11 +7,6 @@ This process allows a non-technical user with the correct Okta permissions to se
 
 Running costs for several thousand requests / month were estimated to be about $5.62 / month, with minimum charges for API Gateway accounting for much of the cost. Further info can be found in the ARB documentation for the project.
 
-## TODO
-
-- Uncomment / test push step in serverless.yml
-- Final testing with live data
-
 ## Data flow
 
 ![sfcc data flow diagram](/images/sfcc-requests-data-flow.png)
