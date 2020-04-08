@@ -8,7 +8,7 @@ RUN apk --update add git && \
     apk add jq && \
     apk add curl && \
     apk add sed
-RUN git config --global url."https://5c312e9a788e15a6946ad401d0c0d4c4121fe423:@github.com/".insteadOf "https://github.com/"   && \
+RUN git config --global url."https:/<github token>:@github.com/".insteadOf "https://github.com/"   && \
     git clone https://github.com/saksdirect/sfcc-ci.git/ && \
     cd sfcc-ci && \
     npm install -g
